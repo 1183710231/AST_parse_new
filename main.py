@@ -38,6 +38,7 @@ class AST_parse():
         self.G = nx.Graph()
         self.all_desc_path = dict()
         self.api_desc = str()
+        self.project_api = dict()
 
     def clear_self(self):
         self.control_node_dict = dict()
@@ -51,6 +52,36 @@ class AST_parse():
         self.all_api_list = list()
         self.G = nx.Graph()
         self.api_desc = str()
+
+    def get_project_api(self, dirname):
+        for maindir, subdir, file_name_list in os.walk(dirname):
+            for java_file in file_name_list:
+                if java_file.endswith('.java'):
+                    apath = os.path.join(maindir, java_file)
+                    class_name = java_file.rstrip('.java')
+                    if not self.project_api.__contains__(maindir):
+                        self.project_api[maindir.lstrip('E:/java_project/github_file_4/')] = dict()
+                    self.project_api[maindir.lstrip('E:/java_project/github_file_4/')][class_name] = list()
+
+                    try:
+                        f_input = open(apath, 'r', encoding='utf-8')
+                        f_read = f_input.read()
+                        tree = javalang.parse.parse(f_read)
+                    except:
+                        print(f'文件{maindir}/{java_file}出现问题')
+                        continue
+                    for path, node in tree:
+                        # # 如过父亲节点中包含条件条件语句，则不予执行
+                        # 提取导入类，并获得包信息
+                        if isinstance(node, Tree.MethodDeclaration):
+                            # self.project_api[maindir][class_name].append(node.name)
+                            self.project_api[maindir][class_name].append([node.name, [i.type.name for i in node.parameters] if node.parameters else None, node.return_type.name if node.return_type else None])
+
+
+
+
+
+
 
     def get_father_return_class(self, path, node):
         path_len = len(path) - 1
@@ -233,6 +264,8 @@ class AST_parse():
 
 
     def parse(self, dirname):
+
+        self.get_project_api(dirname)
 
         java_type = ['byte[]', 'char', 'short', 'int', 'long', 'float', 'double', 'boolean']
         error_list = ['HistoricCaseInstanceCollectionResource.java', 'TaskCollectionResource.java', 'CaseInstanceCollectionResource.java', 'DmnXMLConverter.java', 'HistoricProcessInstanceCollectionResource.java', 'NetDbRenderer.java']
