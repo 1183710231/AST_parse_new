@@ -10,17 +10,22 @@ import time
 
 class TypeExceptin(Exception):
     "this is user's Exception for check the length of name "
-    def __init__(self,str):
+
+    def __init__(self, str):
         self.str = str
+
     def __str__(self):
-        print("该情况暂未处理:"+self.str)
+        print("该情况暂未处理:" + self.str)
+
 
 class MethodNestingExceptin(Exception):
     "this is user's Exception for check the length of name "
-    def __init__(self,str):
+
+    def __init__(self, str):
         self.str = str
+
     def __str__(self):
-        print("方法嵌套:"+self.str)
+        print("方法嵌套:" + self.str)
 
 
 class AST_parse():
@@ -38,7 +43,7 @@ class AST_parse():
         self.G = nx.Graph()
         self.all_desc_path = dict()
         self.api_desc = str()
-        self.project_api = dict()
+        self.project_pack_dict = dict()
 
     def clear_self(self):
         self.control_node_dict = dict()
@@ -59,9 +64,6 @@ class AST_parse():
                 if java_file.endswith('.java'):
                     apath = os.path.join(maindir, java_file)
                     class_name = java_file.rstrip('.java')
-                    if not self.project_api.__contains__(maindir):
-                        self.project_api[maindir.lstrip('E:/java_project/github_file_4/')] = dict()
-                    self.project_api[maindir.lstrip('E:/java_project/github_file_4/')][class_name] = list()
 
                     try:
                         f_input = open(apath, 'r', encoding='utf-8')
@@ -70,18 +72,30 @@ class AST_parse():
                     except:
                         print(f'文件{maindir}/{java_file}出现问题')
                         continue
+
+                    maindir = maindir.lstrip('E:/java_project/github_file_4/')
+                    # if not self.project_pack_dict.__contains__(maindir):
+                    #     self.project_pack_dict[maindir] = dict()
+                    # self.project_pack_dict[maindir][class_name] = list()
+
                     for path, node in tree:
                         # # 如过父亲节点中包含条件条件语句，则不予执行
                         # 提取导入类，并获得包信息
+                        if isinstance(node, Tree.PackageDeclaration):
+                            pakage_name = node.name
+                            if not self.project_pack_dict.__contains__(pakage_name):
+                                self.project_pack_dict[pakage_name] = dict()
+                            self.project_pack_dict[pakage_name][class_name] = list()
                         if isinstance(node, Tree.MethodDeclaration):
-                            # self.project_api[maindir][class_name].append(node.name)
-                            self.project_api[maindir][class_name].append([node.name, [i.type.name for i in node.parameters] if node.parameters else None, node.return_type.name if node.return_type else None])
-
-
-
-
-
-
+                            try:
+                                self.project_pack_dict[pakage_name][class_name].append([node.name, maindir])
+                            except UnboundLocalError as e:
+                                # 当java文件没有所在包时
+                                pakage_name = ''
+                                self.project_pack_dict[pakage_name] = dict()
+                                self.project_pack_dict[pakage_name][class_name] = list()
+                                self.project_pack_dict[pakage_name][class_name].append([node.name, maindir])
+                            # self.project_pack_dict[maindir][class_name].append([node.name, [i.type.name for i in node.parameters] if node.parameters else None, node.return_type.name if node.return_type else None])
 
     def get_father_return_class(self, path, node):
         path_len = len(path) - 1
@@ -94,7 +108,8 @@ class AST_parse():
         if hasattr(father_node, 'qualifier') and (self.var_dict.__contains__(father_node.qualifier)):
             method_decs = self.get_overload_method(father_node)
             if method_decs:
-                father_return_class = method_decs[2]
+                if len(method_decs) == 3:
+                    father_return_class = method_decs[2]
         # 返回格式 包+类名
         return father_return_class
 
@@ -176,7 +191,8 @@ class AST_parse():
 
             elif len(overload_method) == 1:
                 right_method = overload_method[0]
-            else: right_method = None
+            else:
+                right_method = None
             # 返回类型：[方法名，[参数]，返回值]
             return right_method
         except TypeExceptin as e:
@@ -219,7 +235,8 @@ class AST_parse():
                 # 证明该循环中没有api
                 if not control_node[3]:
                     # 环
-                    if isinstance(control_node[0], Tree.WhileStatement) or isinstance(control_node[0], Tree.ForStatement):
+                    if isinstance(control_node[0], Tree.WhileStatement) or isinstance(control_node[0],
+                                                                                      Tree.ForStatement):
                         self.neighbor_dict.get(self.last_api).add(control_node[4])
                         self.G.add_edge(control_node[3], self.last_api)
                     self.neighbor_dict.get(self.last_api).add(control_node[2])
@@ -262,197 +279,231 @@ class AST_parse():
         self.control_node_dict.clear()
         self.last_api = -1
 
-
     def parse(self, dirname):
 
         self.get_project_api(dirname)
 
         java_type = ['byte[]', 'char', 'short', 'int', 'long', 'float', 'double', 'boolean']
-        error_list = ['HistoricCaseInstanceCollectionResource.java', 'TaskCollectionResource.java', 'CaseInstanceCollectionResource.java', 'DmnXMLConverter.java', 'HistoricProcessInstanceCollectionResource.java', 'NetDbRenderer.java']
+        error_list = ['HistoricCaseInstanceCollectionResource.java', 'TaskCollectionResource.java',
+                      'CaseInstanceCollectionResource.java', 'DmnXMLConverter.java',
+                      'HistoricProcessInstanceCollectionResource.java', 'NetDbRenderer.java']
         # file_handle = open('1.txt', mode='w')
         # file_handle.truncate(0)
         for maindir, subdir, file_name_list in os.walk(dirname):
             for java_file in file_name_list:
-                try:
-                    if java_file.endswith('.java'):
-                        self.clear_self()
-                        # print(f'正在处理文件{maindir}/{java_file}')
-                        if java_file in error_list:
-                            continue
-                        # if java_file == 'TIFFIFD.java':
-                        #     print('.')
-                        apath = os.path.join(maindir, java_file)
-                        try:
-                            f_input = open(apath, 'r', encoding='utf-8')
-                            f_read = f_input.read()
-                            tree = javalang.parse.parse(f_read)
-                        except:
-                            print(f'文件{maindir}/{java_file}出现问题')
-                            continue
-                        f_input.seek(0)
-                        lines = f_input.readlines()
-                        pack_dict = self.load_pkl('api2desc.pkl')
-                        import_dict = dict()
-                        class_meths_dict = dict()
-                        # 存储控制流语句的上一个api和和当前api
-                        # undo 核心包java.lang默认导入
-                        class_meths_dict.update(pack_dict.get('java.lang'))
-                        for class_name in class_meths_dict.keys():
-                            import_dict[class_name] = 'java.lang'
+                # try:
+                if java_file.endswith('.java'):
+                    self.clear_self()
+                    # print(f'正在处理文件{maindir}/{java_file}')
+                    if java_file in error_list:
+                        continue
+                    # if java_file == 'TIFFIFD.java':
+                    #     print('.')
+                    apath = os.path.join(maindir, java_file)
+                    try:
+                        f_input = open(apath, 'r', encoding='utf-8')
+                        f_read = f_input.read()
+                        tree = javalang.parse.parse(f_read)
+                    except:
+                        print(f'文件{maindir}/{java_file}出现问题')
+                        continue
+                    f_input.seek(0)
+                    lines = f_input.readlines()
+                    pack_dict = self.load_pkl('api2desc.pkl')
+                    import_dict = dict()
+                    class_meths_dict = dict()
+                    # 存储控制流语句的上一个api和和当前api
+                    # undo 核心包java.lang默认导入
+                    class_meths_dict.update(pack_dict.get('java.lang'))
+                    for class_name in class_meths_dict.keys():
+                        import_dict[class_name] = 'java.lang'
 
-                        for path, node in tree:
-                            # print(path, node)
-                            # print(node)
-                            # 所有条件语句，待补充
-                            # # 如过父亲节点中包含条件条件语句，则不予执行
-                            # 提取导入类，并获得包信息
-                            if isinstance(node, Tree.Import):
-                                # undo .*情况node.path没有*
-                                # class_pack_dict   类名 -》 [包和[所有方法[方法名，参数（可能为none），返回值（可能为void）]]]
-                                # 需要判断该引用是否是标准库
-                                if pack_dict.__contains__(node.path):
-                                    pack_contain_class = pack_dict.get(node.path)
-                                    class_meths_dict.update(pack_contain_class)
-                                    for class_name in pack_contain_class.keys():
-                                        import_dict[class_name] = node.path
-                                else:
-                                    pakage_list = node.path.split('.')
-                                    class_name = pakage_list[len(pakage_list) - 1]
-                                    pack_name = pakage_list[0]
-                                    for i in range(1, len(pakage_list) - 1):
-                                        pack_name += f'.{pakage_list[i]}'
-                                    if pack_dict.__contains__(pack_name):
-                                        class_meths_dict[class_name] = pack_dict.get(pack_name).get(class_name)
-                                        import_dict[class_name] = pack_name
+                    has_PackageDeclaration = True
+                    for path, node in tree:
+                        # print(path, node)
+                        # print(node)
+                        # 所有条件语句，待补充
+                        # # 如过父亲节点中包含条件条件语句，则不予执行
+                        # 提取导入类，并获得包信息
+                        if isinstance(node, Tree.Import):
+                            # 当没有所属包时
+                            if not has_PackageDeclaration:
+                                pakage_inside_class = self.project_pack_dict.get('')
+                                class_meths_dict.update(pakage_inside_class)
+                                for class_name in pakage_inside_class.keys():
+                                    import_dict[class_name] = ''
+                            # undo .*情况node.path没有*
+                            # class_pack_dict   类名 -》 [包和[所有方法[方法名，参数（可能为none），返回值（可能为void）]]]
+                            # 需要判断该引用是否是标准库
+                            if self.project_pack_dict.__contains__(node.path):
+                                pack_contain_class = self.project_pack_dict.get(node.path)
+                                class_meths_dict.update(pack_contain_class)
+                                for class_name in pack_contain_class.keys():
+                                    import_dict[class_name] = node.path
 
-                            # 为应对静态变量
-                            elif isinstance(node, Tree.ClassDeclaration):
-                                for class_name in class_meths_dict.keys():
-                                    pack_name = import_dict.get(class_name)
-                                    self.var_dict[class_name] = [f'{pack_name}.{class_name}', class_meths_dict.get(class_name)]
-                                self.get_api_decs_lists()
+                            elif pack_dict.__contains__(node.path):
+                                pack_contain_class = pack_dict.get(node.path)
+                                class_meths_dict.update(pack_contain_class)
+                                for class_name in pack_contain_class.keys():
+                                    import_dict[class_name] = node.path
+                            else:
+                                pakage_list = node.path.split('.')
+                                class_name = pakage_list[len(pakage_list) - 1]
+                                pack_name = pakage_list[0]
+                                for i in range(1, len(pakage_list) - 1):
+                                    pack_name += f'.{pakage_list[i]}'
+                                if pack_dict.__contains__(pack_name):
+                                    class_meths_dict[class_name] = pack_dict.get(pack_name).get(class_name)
+                                    import_dict[class_name] = pack_name
+                                elif self.project_pack_dict.__contains__(pack_name):
+                                    class_meths_dict[class_name] = self.project_pack_dict.get(pack_name).get(class_name)
+                                    import_dict[class_name] = pack_name
 
-                            elif isinstance(node, Tree.MethodDeclaration):
-                                # pattern = f'\/\*(\s|.)*?\*\/(\s)*{node.name}'
-                                # f_input.seek(0)
-                                # re.findall(pattern, f_read)
-                                # if node.name == 'writeCookieValue':
-                                #     print('a')
-                                # if node.name == 'getRawLayerIndex':
-                                #     print('a')
-                                if not self.api_desc == '':
-                                    self.all_api_list.append(list(self.api_list))
-                                    self.all_neighbor_dict.append(dict(self.neighbor_dict))
-                                    # 把索引转为api，之所以用索引是因为api有重名的
-                                    # undo 只有一个api调用的方法被舍弃
-                                    if nx.nodes(self.G):
-                                        for num_path in nx.all_simple_paths(self.G, source=0, target=len(self.G.nodes)-1):
-                                            api_path = list()
-                                            for num_api in num_path:
-                                                api_path.append(self.api_list[num_api])
-                                            if self.all_desc_path.__contains__(self.api_desc):
-                                                self.all_desc_path[self.api_desc].append(api_path)
-                                                # undo
-                                                if len(self.all_desc_path[self.api_desc]) > 50:
-                                                    break
-                                            else:
-                                                self.all_desc_path[self.api_desc] = [api_path]
-                                    self.api_desc = ''
+                        elif isinstance(node, Tree.PackageDeclaration):
+                            pakage_inside_class = self.project_pack_dict.get(node.name)
+                            class_meths_dict.update(pakage_inside_class)
+                            for class_name in pakage_inside_class.keys():
+                                import_dict[class_name] = node.name
 
-                                api_line = node.position.line - 2 - len(node.annotations)
-                                find_start = False
-                                # undo 如果该方法没有注释
-                                if '*/' not in lines[api_line]:
-                                    find_start = True
-                                if '*/' in lines[api_line] and '/*' in lines[api_line]:
-                                    find_start = True
-                                    self.api_desc = lines[api_line].strip().strip('/').strip('*')
-                                try:
-                                    while(not find_start):
-                                        s = lines[api_line - 20:api_line]
-                                        for i in range(1, 21):
-                                            if '/*' in s[-i]:
-                                                find_start = True
-                                                self.api_desc = str()
-                                                for j in range(1, i):
-                                                    this_line = s[-(i - j)].strip().lstrip('*')
-                                                    if this_line.startswith('TODO') or this_line.startswith('@param') or this_line.startswith('@return') or \
-                                                        this_line.startswith('NOTE:') or this_line.startswith('test'):
-                                                        break
-                                                    if this_line.endswith('.'):
-                                                        self.api_desc += this_line
-                                                        break
-                                                    self.api_desc += this_line
+                        # 为应对静态变量
+                        elif isinstance(node, Tree.ClassDeclaration):
+                            for class_name in class_meths_dict.keys():
+                                pack_name = import_dict.get(class_name)
+                                self.var_dict[class_name] = [f'{pack_name}.{class_name}',
+                                                             class_meths_dict.get(class_name)]
+                            self.get_api_decs_lists()
+
+                        elif isinstance(node, Tree.MethodDeclaration):
+                            # pattern = f'\/\*(\s|.)*?\*\/(\s)*{node.name}'
+                            # f_input.seek(0)
+                            # re.findall(pattern, f_read)
+                            # if node.name == 'writeCookieValue':
+                            #     print('a')
+                            # if node.name == 'getRawLayerIndex':
+                            #     print('a')
+                            if not self.api_desc == '':
+                                self.all_api_list.append(list(self.api_list))
+                                self.all_neighbor_dict.append(dict(self.neighbor_dict))
+                                # 把索引转为api，之所以用索引是因为api有重名的
+                                # undo 只有一个api调用的方法被舍弃
+                                if nx.nodes(self.G):
+                                    for num_path in nx.all_simple_paths(self.G, source=0, target=len(self.G.nodes) - 1):
+                                        api_path = list()
+                                        for num_api in num_path:
+                                            api_path.append(self.api_list[num_api])
+                                        if self.all_desc_path.__contains__(self.api_desc):
+                                            self.all_desc_path[self.api_desc].append(api_path)
+                                            # undo
+                                            if len(self.all_desc_path[self.api_desc]) > 50:
                                                 break
-                                        api_line -= 20
-                                except IndexError:
-                                    self.api_desc = ''
-                                self.G.clear()
-                                self.api_list.clear()
-                                self.neighbor_dict.clear()
-                                self.control_node_dict.clear()
-                                self.last_api = -1
-
-
-                            elif isinstance(node, Tree.IfStatement) or isinstance(node, Tree.WhileStatement) or isinstance(node, Tree.ForStatement):
-                                # 如果新的path长度恰好和之前相等，那么就会被覆盖
-                                if not self.api_desc == '':
-                                    self.control_node_dict[f'{len(path)},{hash(node)}'] = [node, self.last_api, None, True, None]
-
-                            #通过path获得局部变量定义，未确定类
-                            elif isinstance(node, Tree.VariableDeclarator):
-                                path_len = len(path) - 1
-                                if isinstance(path[path_len], list):
-                                    path_len -= 1
-                                var_class_name = path[path_len].type.name
-                                if class_meths_dict.__contains__(var_class_name):
-                                    pack_name = import_dict.get(var_class_name)
-                                    self.var_dict[node.name] = [f'{pack_name}.{var_class_name}', class_meths_dict.get(var_class_name)]
-                                # 在这里加入java基本类型变量，为参数判断准备
-                                if var_class_name in java_type:
-                                    self.var_dict[node.name] = var_class_name
-
-                            # 形参，获取变量名及类
-                            elif isinstance(node, Tree.FormalParameter) and not self.api_desc == '':
-                                par_class_name = node.type.name
-                                if class_meths_dict.__contains__(par_class_name):
-                                    self.var_dict[node.name] = [f'{pack_name}.{class_name}', class_meths_dict.get(par_class_name)]
-                            # 方法调用，须与变量名关联，变量名与类关联，类与包信息关联
-                            # undo 多级调用根本没进来
-                            elif isinstance(node, Tree.MethodInvocation) and not self.api_desc == '':
-                                # print(node)
-                                # if node.member == 'getRequest':
-                                #     print('a')
-                                if self.var_dict.__contains__(node.qualifier):
-                                    # print(node)
-                                    var_name = node.qualifier
-                                    method_class = self.var_dict[var_name][0]
-                                    method_decs = self.get_overload_method(node)
-                                    if method_decs:
-                                        self.api_list.append(f'{method_class}.{method_decs[0]}({method_decs[1]})')
-                                        self.update_control_dict(path, node)
-                                # 当连续调用
-                                elif not node.qualifier:
-                                    var_father_return_class = self.get_father_return_class(path, node)
-                                    if not var_father_return_class is None:
-                                        # 当父节点方法返回值为None
-                                        if var_father_return_class == 'None.E':
-                                            self.api_list.append(f'E.{node.member}(UNKNOW)')
-                                            self.update_control_dict(path, node)
-                                        # 当父节点返回为正常类
                                         else:
-                                            node.qualifier = var_father_return_class.split('.')[-1]
-                                            # 当父节点返回为正常类
-                                            if node.qualifier in import_dict.keys():
-                                                method_decs = self.get_overload_method(node)
-                                                if method_decs:
-                                                    self.api_list.append(f'{var_father_return_class}.{method_decs[0]}({method_decs[1]})')
-                                                    self.update_control_dict(path, node)
-                            # file_handle.write('path=' + str(path) + '\n')
-                            # file_handle.write('node=' + str(node) + '\n'+ '\n'+ '\n')
-                except:
-                    print(f'文件{maindir}/{java_file}出现问题')
-                    continue
+                                            self.all_desc_path[self.api_desc] = [api_path]
+                                self.api_desc = ''
+
+                            api_line = node.position.line - 2 - len(node.annotations)
+                            find_start = False
+                            # undo 如果该方法没有注释
+                            if '*/' not in lines[api_line]:
+                                find_start = True
+                            if '*/' in lines[api_line] and '/*' in lines[api_line]:
+                                find_start = True
+                                self.api_desc = lines[api_line].strip().strip('/').strip('*')
+                            try:
+                                while (not find_start):
+                                    s = lines[api_line - 20:api_line]
+                                    for i in range(1, 21):
+                                        if '/*' in s[-i]:
+                                            find_start = True
+                                            self.api_desc = str()
+                                            for j in range(1, i):
+                                                this_line = s[-(i - j)].strip().lstrip('*')
+                                                if this_line.startswith('TODO') or this_line.startswith(
+                                                        '@param') or this_line.startswith('@return') or \
+                                                        this_line.startswith('NOTE:') or this_line.startswith('test'):
+                                                    break
+                                                if this_line.endswith('.'):
+                                                    self.api_desc += this_line
+                                                    break
+                                                self.api_desc += this_line
+                                            break
+                                    api_line -= 20
+                            except IndexError:
+                                self.api_desc = ''
+                            self.G.clear()
+                            self.api_list.clear()
+                            self.neighbor_dict.clear()
+                            self.control_node_dict.clear()
+                            self.last_api = -1
+
+
+                        elif isinstance(node, Tree.IfStatement) or isinstance(node, Tree.WhileStatement) or isinstance(
+                                node, Tree.ForStatement):
+                            # 如果新的path长度恰好和之前相等，那么就会被覆盖
+                            if not self.api_desc == '':
+                                self.control_node_dict[f'{len(path)},{hash(node)}'] = [node, self.last_api, None, True,
+                                                                                       None]
+
+                        # 通过path获得局部变量定义，未确定类
+                        elif isinstance(node, Tree.VariableDeclarator):
+                            path_len = len(path) - 1
+                            if isinstance(path[path_len], list):
+                                path_len -= 1
+                            var_class_name = path[path_len].type.name
+                            if class_meths_dict.__contains__(var_class_name):
+                                pack_name = import_dict.get(var_class_name)
+                                self.var_dict[node.name] = [f'{pack_name}.{var_class_name}',
+                                                            class_meths_dict.get(var_class_name)]
+                            # 在这里加入java基本类型变量，为参数判断准备
+                            if var_class_name in java_type:
+                                self.var_dict[node.name] = var_class_name
+
+                        # 形参，获取变量名及类
+                        elif isinstance(node, Tree.FormalParameter) and not self.api_desc == '':
+                            par_class_name = node.type.name
+                            if class_meths_dict.__contains__(par_class_name):
+                                self.var_dict[node.name] = [f'{pack_name}.{class_name}',
+                                                            class_meths_dict.get(par_class_name)]
+                        # 方法调用，须与变量名关联，变量名与类关联，类与包信息关联
+                        # undo 多级调用根本没进来
+                        elif isinstance(node, Tree.MethodInvocation) and not self.api_desc == '':
+                            # print(node)
+                            # if node.member == 'getRequest':
+                            #     print('a')
+                            if self.var_dict.__contains__(node.qualifier):
+                                # print(node)
+                                var_name = node.qualifier
+
+                                method_decs = self.get_overload_method(node)
+                                if method_decs:
+                                    if len(method_decs) == 3:
+                                        method_class = self.var_dict[var_name][0]
+                                        self.api_list.append(f'{method_class}.{method_decs[0]}({method_decs[1]})')
+                                    if len(method_decs) == 2:
+                                        self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
+                                    self.update_control_dict(path, node)
+                            # 当连续调用
+                            elif not node.qualifier:
+                                var_father_return_class = self.get_father_return_class(path, node)
+                                if not var_father_return_class is None:
+                                    # 当父节点方法返回值为None
+                                    if var_father_return_class == 'None.E':
+                                        self.api_list.append(f'E.{node.member}(UNKNOW)')
+                                        self.update_control_dict(path, node)
+                                    # 当父节点返回为正常类
+                                    else:
+                                        node.qualifier = var_father_return_class.split('.')[-1]
+                                        # 当父节点返回为正常类
+                                        if node.qualifier in import_dict.keys():
+                                            method_decs = self.get_overload_method(node)
+                                            if method_decs:
+                                                self.api_list.append(
+                                                    f'{var_father_return_class}.{method_decs[0]}({method_decs[1]})')
+                                                self.update_control_dict(path, node)
+                        # file_handle.write('path=' + str(path) + '\n')
+                        # file_handle.write('node=' + str(node) + '\n'+ '\n'+ '\n')
+            # except:
+            #     print(f'文件{maindir}/{java_file}出现问题')
+            #     continue
         # print(self.all_api_list)
         # print(self.all_neighbor_dict)
         # print(self.all_desc_path)
@@ -464,9 +515,11 @@ class AST_parse():
 
         # file_handle.close()
 
+
 def write_file(path, str):
     with open(path, 'a') as file:
         file.write(str)
+
 
 if __name__ == '__main__':
     # my_parse = AST_parse()
@@ -475,12 +528,10 @@ if __name__ == '__main__':
     # my_parse.parse('demo_test')
     # my_parse.parse('spring-session-core')
 
-
-
-
     # 处理github项目
     file_num = 0
     maindir = 'E:/java_project/github_file_4'
+    # maindir = 'C:/Users/wkr/Desktop/项目/AST_parse_new'
     write_file('log.txt', '\n当前时间为：{}\n'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
     write_file('log.txt', f'正在解析{maindir}')
     file_list = os.listdir(maindir)
@@ -494,9 +545,6 @@ if __name__ == '__main__':
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
         my_parse.parse(f'{maindir}/{subdir}')
 
-
-
-
 # undo UNKNOW 已解决
 # undo 两个局部变量名字一样怎么办 ,已解决
 # undo CatchClauseParameter(annotations=None, modifiers=None, name=e, types=['IOException']
@@ -509,3 +557,5 @@ if __name__ == '__main__':
 # undo raplase为什么不在里面
 # undo 生成路径 do
 # undo 循环
+
+

@@ -38,7 +38,7 @@ public class ClicyAction implements IObjectActionDelegate {
 	}
 
 	/*
-	 * (non-Javadoc)
+	 * yonglaiceshi dai ma shi fou zheng que de zhu shi.
 	 *
 	 * @see org.eclipse.ui.IActionDelegate#run(org.eclipse.jface.action.IAction)
 	 */

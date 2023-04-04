@@ -12,7 +12,12 @@ class AstToDot extends ASTVisitor {
 	AstToDot(String filename ){
         this.dotfile = filename + ".txt";
     }
-	
+
+	/*
+	 * yonglaiceshi dai ma shi fou zheng que de zhu shi.
+	 *
+	 * @see org.eclipse.core.runtime.Plugins#start(org.osgi.framework.BundleContext)
+	 */
 	public void preVisit(ASTNode node) {
 		String to_write = "";
 		boolean to_append = true;
