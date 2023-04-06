@@ -53,9 +53,8 @@ class AST_parse():
         self.now_api = None
         self.neighbor_dict = dict()
         self.all_neighbor_dict = list()
-        self.api_list = list()
+        # self.api_list = list()
         self.all_api_list = list()
-        self.G = nx.Graph()
         self.api_desc = str()
 
     def get_project_api(self, dirname):
@@ -88,7 +87,7 @@ class AST_parse():
                             self.project_pack_dict[pakage_name][class_name] = list()
                         if isinstance(node, Tree.MethodDeclaration):
                             try:
-                                self.project_pack_dict[pakage_name][class_name].append([node.name, maindir])
+                                self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}'])
                             except UnboundLocalError as e:
                                 # 当java文件没有所在包时
                                 pakage_name = ''
@@ -165,7 +164,10 @@ class AST_parse():
             method_list = self.var_dict[var_name][1]
             overload_method = [method for method in method_list if method[0] == node.member]
             # undo 当重叠调用时，参数包含MethodInvocation，和MemberReference两种
-            if len(overload_method) > 1:
+            # 当时内部函数时，暂时添加参数返回值，无法确认重载方法
+            if len(overload_method) > 0 and len(overload_method[0]) == 2:
+                right_method = overload_method[0]
+            elif len(overload_method) > 1:
                 # 参数类型只包含java基本类型和标准库类
                 # undo 如果参数为泛型的话，参数的类型可能为自定义类，该情况暂时抛弃
                 # undo 如果参数中包含方法调用，则暂时抛弃
@@ -349,6 +351,8 @@ class AST_parse():
                             else:
                                 pakage_list = node.path.split('.')
                                 class_name = pakage_list[len(pakage_list) - 1]
+                                if class_name == 'AstToDot':
+                                    print('a')
                                 pack_name = pakage_list[0]
                                 for i in range(1, len(pakage_list) - 1):
                                     pack_name += f'.{pakage_list[i]}'
@@ -371,6 +375,7 @@ class AST_parse():
                                 pack_name = import_dict.get(class_name)
                                 self.var_dict[class_name] = [f'{pack_name}.{class_name}',
                                                              class_meths_dict.get(class_name)]
+                            # 为防止最后一个方法失效
                             self.get_api_decs_lists()
 
                         elif isinstance(node, Tree.MethodDeclaration):
@@ -379,8 +384,8 @@ class AST_parse():
                             # re.findall(pattern, f_read)
                             # if node.name == 'writeCookieValue':
                             #     print('a')
-                            # if node.name == 'getRawLayerIndex':
-                            #     print('a')
+                            if node.name == 'run':
+                                print('a')
                             if not self.api_desc == '':
                                 self.all_api_list.append(list(self.api_list))
                                 self.all_neighbor_dict.append(dict(self.neighbor_dict))
@@ -467,8 +472,8 @@ class AST_parse():
                         # undo 多级调用根本没进来
                         elif isinstance(node, Tree.MethodInvocation) and not self.api_desc == '':
                             # print(node)
-                            # if node.member == 'getRequest':
-                            #     print('a')
+                            if node.member == 'endVisit':
+                                print('a')
                             if self.var_dict.__contains__(node.qualifier):
                                 # print(node)
                                 var_name = node.qualifier
@@ -523,6 +528,7 @@ def write_file(path, str):
 
 if __name__ == '__main__':
     # my_parse = AST_parse()
+    # my_parse.parse('city-master')
     # my_parse.while_load_pkl('desc_path_dict_2.pkl')
     # my_parse.while_load_pkl('all_desc_path.pkl')
     # my_parse.parse('demo_test')
@@ -530,8 +536,8 @@ if __name__ == '__main__':
 
     # 处理github项目
     file_num = 0
-    maindir = 'E:/java_project/github_file_4'
-    # maindir = 'C:/Users/wkr/Desktop/项目/AST_parse_new'
+    # maindir = 'E:/java_project/github_file_4'
+    maindir = 'C:/Users/wkr/Desktop/项目/AST_parse_new'
     write_file('log.txt', '\n当前时间为：{}\n'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
     write_file('log.txt', f'正在解析{maindir}')
     file_list = os.listdir(maindir)
@@ -543,7 +549,8 @@ if __name__ == '__main__':
         # if file_num < 297:
         #     continue
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
-        my_parse.parse(f'{maindir}/{subdir}')
+        if os.path.isdir(f'{maindir}/{subdir}') or subdir.endswith('.java'):
+            my_parse.parse(f'{maindir}/{subdir}')
 
 # undo UNKNOW 已解决
 # undo 两个局部变量名字一样怎么办 ,已解决

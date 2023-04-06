@@ -11,6 +11,7 @@ import org.eclipse.ui.IObjectActionDelegate;
 import org.eclipse.ui.IWorkbenchPart;
 
 import com.aasis21.app.AstToDot;
+import java.io.File;
 
 /**
  * The action delegate for both actions "Change Method Visability" and "Move
@@ -43,11 +44,16 @@ public class ClicyAction implements IObjectActionDelegate {
 	 * @see org.eclipse.ui.IActionDelegate#run(org.eclipse.jface.action.IAction)
 	 */
 	public void run(IAction action) {
+	    String to_write = "";
 		if (selection instanceof IStructuredSelection) {
 			ICompilationUnit fileUnit = (ICompilationUnit) ((IStructuredSelection) selection)
 					.getFirstElement();
 			createActionExuecutable(action.getId(),fileUnit);
 			AstToDot dotfile = new AstToDot(list.add(fileUnit));
+			dotfile.endVisit(fileUnit);
+			to_write  += Integer.toString(10);
+			dotfile.endVisit(fileUnit);
+			dotfile.endVisit(fileUnit);
 		}
 
 	}
