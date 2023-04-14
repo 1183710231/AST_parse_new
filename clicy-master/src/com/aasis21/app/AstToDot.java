@@ -6,7 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 
 
-class AstToDot extends ASTVisitor {
+class AstToDot extends ClicyAction {
 	String dotfile;
 	
 	AstToDot(String filename ){
@@ -74,7 +74,7 @@ class AstToDot extends ASTVisitor {
      *            the AST root node. Bindings have to have been resolved.
      */
     public void generate(CompilationUnit unit) {
-		unit.accept(this);
+		String s = unit.accept(this);
 	}
 
 }
