@@ -2,6 +2,8 @@ package com.aasis21.app;
 
 import org.eclipse.core.runtime.Plugin;
 import org.osgi.framework.BundleContext;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * The activator class controls the plug-in life cycle
@@ -15,6 +17,7 @@ public class Activator extends AstToDot {
 	// The shared instance
 	private static Activator plugin;
 
+    List l = new ArrayList();
 	/**
 	 * The constructor
 	 */
@@ -29,6 +32,8 @@ public class Activator extends AstToDot {
 	 */
 // 	 @Override
 	public void start(BundleContext context) throws Exception {
+	    test();
+	    l.get(0).toString();
 		super.start(context);
 	}
 
@@ -39,6 +44,8 @@ public class Activator extends AstToDot {
 	 */
 	@Override
 	public void stop(BundleContext context) throws Exception {
+	    test();
+	    l.get(0).toString();
 		plugin = null;
 		super.stop(context);
 	}
@@ -50,6 +57,10 @@ public class Activator extends AstToDot {
 	 */
 	public static Activator getDefault() {
 		return plugin;
+	}
+
+	public void test() {
+		System.out.println("ddddd");
 	}
 
 }

@@ -58,32 +58,32 @@ public class ClicyAction implements IObjectActionDelegate {
 
 	}
 	
-// 	private void createActionExuecutable(String id,ICompilationUnit fileUnit) {
-// 		if ("com.aasis21.app.ASTAction".equals(id)){
-// 			CompilationUnit unit = parse(fileUnit);
-// 			AstToDot dotfile = new AstToDot(fileUnit.getElementName());
-// 			dotfile.generate(unit);
-// 		}
-// 		else if("com.aasis21.app.IFFINDER".equals(id)){
-// 			CompilationUnit unit = parse(fileUnit);
-// 			IfFinderVisitor if_finder = new IfFinderVisitor();
-// 			if_finder.generate(unit);
-// 		}
-// 		else {
-// 			throw new IllegalArgumentException(id);
-// 		}
-// 	}
-//
-//
-// 	protected CompilationUnit parse(ICompilationUnit fileUnit) {
-// 		ASTParser parser = ASTParser.newParser(AST.JLS8);
-// 		parser.setKind(ASTParser.K_COMPILATION_UNIT);
-// 		parser.setSource(fileUnit); // set source
-// 		parser.setResolveBindings(true); // we need bindings later on
-// 		return (CompilationUnit) parser.createAST(null /* IProgressMonitor */); // parse
-// 	}
-//
-// 	public void selectionChanged(IAction action, ISelection selection) {
-// 		this.selection = selection;
-// 	}
+	private void createActionExuecutable(String id,ICompilationUnit fileUnit) {
+		if ("com.aasis21.app.ASTAction".equals(id)){
+			CompilationUnit unit = parse(fileUnit);
+			AstToDot dotfile = new AstToDot(fileUnit.getElementName());
+			dotfile.generate(unit);
+		}
+		else if("com.aasis21.app.IFFINDER".equals(id)){
+			CompilationUnit unit = parse(fileUnit);
+			IfFinderVisitor if_finder = new IfFinderVisitor();
+			if_finder.generate(unit);
+		}
+		else {
+			throw new IllegalArgumentException(id);
+		}
+	}
+
+
+	protected CompilationUnit parse(ICompilationUnit fileUnit) {
+		ASTParser parser = ASTParser.newParser(AST.JLS8);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(fileUnit); // set source
+		parser.setResolveBindings(true); // we need bindings later on
+		return (CompilationUnit) parser.createAST(null /* IProgressMonitor */); // parse
+	}
+
+	public void selectionChanged(IAction action, ISelection selection) {
+		this.selection = selection;
+	}
 }
