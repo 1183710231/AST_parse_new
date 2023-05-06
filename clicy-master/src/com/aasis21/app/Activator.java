@@ -1,9 +1,9 @@
 package com.aasis21.app;
 
-import org.eclipse.core.runtime.Plugin;
-import org.osgi.framework.BundleContext;
-import java.util.List;
-import java.util.ArrayList;
+// import org.eclipse.core.runtime.Plugin;
+// import org.osgi.framework.BundleContext;
+// import java.util.List;
+// import java.util.ArrayList;
 
 /**
  * The activator class controls the plug-in life cycle
@@ -24,6 +24,19 @@ public class Activator extends AstToDot {
 	public Activator() {
 		plugin = this;
 	}
+    public class Draw {//内部类
+        public void drawSahpe() {
+          System.out.println(radius);//外部类的private成员
+          System.out.prinlt(count);//外部类的静态成员
+        }
+      }
+
+    static class InnerClass {
+          static String test = "test";
+          int a = 1;
+          static void fun1() {}
+          void fun2() {}
+      }
 
 	/*
 	 * (non-Javadoc)
@@ -64,3 +77,10 @@ public class Activator extends AstToDot {
 	}
 
 }
+
+class Draw2 {//内部类
+        public void drawSahpe() {
+          System.out.println(radius);//外部类的private成员
+          System.out.prinlt(count);//外部类的静态成员
+        }
+      }

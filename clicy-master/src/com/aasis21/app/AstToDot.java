@@ -2,8 +2,9 @@ package com.aasis21.app;
 
 import org.eclipse.jdt.core.dom.*;
 import java.io.File;
-import java.io.FileWriter;  
+import java.io.FileWriter;
 import java.io.IOException;
+
 
 
 class AstToDot extends ClicyAction {
@@ -19,6 +20,9 @@ class AstToDot extends ClicyAction {
 	 * @see org.eclipse.core.runtime.Plugins#start(org.osgi.framework.BundleContext)
 	 */
 	public void preVisit(ASTNode node) {
+	    ClicyAction c = new ClicyAction();
+	    c.run('a').createActionExuecutable('a', 1);
+	    c.createActionExuecutable('a', 1).toString();
 		String to_write = "";
 		boolean to_append = true;
 		if(node.getNodeType() == 15){
@@ -37,6 +41,7 @@ class AstToDot extends ClicyAction {
 			to_write += "\"]\n";
 			ASTNode parent_node = node.getParent();
 	        to_write += Integer.toString(parent_node.hashCode()) + "->" + Integer.toString(node.hashCode()) + "\n";
+	        c.parse('hhh');
 		} 
 		
 		System.out.println(to_write);		
@@ -51,7 +56,13 @@ class AstToDot extends ClicyAction {
 	        if (writer != null) try { writer.close(); } catch (IOException ignore) {}
 	    } 
 	}
-	
+
+	/**
+     * ends the process.
+     *
+     * @param unit
+     *            the AST root node. Bindings have to have been resolved.
+     */
 	public void endVisit(CompilationUnit node) {
 		File file = new File(dotfile);
 	    FileWriter writer = null;
