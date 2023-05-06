@@ -19,7 +19,7 @@ class AstToDot extends ClicyAction {
 	 *
 	 * @see org.eclipse.core.runtime.Plugins#start(org.osgi.framework.BundleContext)
 	 */
-	public void preVisit(ASTNode node) {
+	public String preVisit(ASTNode node) {
 	    ClicyAction c = new ClicyAction();
 	    c.run('a').createActionExuecutable('a', 1);
 	    c.createActionExuecutable('a', 1).toString();
@@ -63,7 +63,7 @@ class AstToDot extends ClicyAction {
      * @param unit
      *            the AST root node. Bindings have to have been resolved.
      */
-	public void endVisit(CompilationUnit node) {
+	public String endVisit(String node) {
 		File file = new File(dotfile);
 	    FileWriter writer = null;
 	    try {

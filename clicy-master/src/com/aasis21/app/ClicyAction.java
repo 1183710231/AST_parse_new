@@ -43,7 +43,7 @@ public class ClicyAction implements IObjectActionDelegate {
 	 *
 	 * @see org.eclipse.ui.IActionDelegate#run(org.eclipse.jface.action.IAction)
 	 */
-	public void run(IAction action) {
+	public ClicyAction run(IAction action) {
 	    String to_write = "";
 		if (selection instanceof IStructuredSelection) {
 			ICompilationUnit fileUnit = (ICompilationUnit) ((IStructuredSelection) selection)
@@ -58,7 +58,7 @@ public class ClicyAction implements IObjectActionDelegate {
 
 	}
 	
-	private void createActionExuecutable(String id,ICompilationUnit fileUnit) {
+	private Integer createActionExuecutable(String id,ICompilationUnit fileUnit) {
 		if ("com.aasis21.app.ASTAction".equals(id)){
 			CompilationUnit unit = parse(fileUnit);
 			AstToDot dotfile = new AstToDot(fileUnit.getElementName());
