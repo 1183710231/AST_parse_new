@@ -209,7 +209,7 @@ class AST_parse():
 
 
 
-
+    # TODO:会出现包名重复的问题
     def get_extend_pakage(self, package_class_name):
         if package_class_name == '':
             return []
@@ -525,7 +525,7 @@ class AST_parse():
     def parse_java_file(self, java_file, maindir):
         java_type = ['byte[]', 'char', 'short', 'int', 'long', 'float', 'double', 'boolean']
         # TODO:没有解决内部类的问题，例：'E:/java_project/github_file_4/3d-bin-container-packing-master\\core\\src\\main\\java\\com\\github\\skjolber\\packing\\iterator\\DefaultPermutationRotationIterator.java'
-        error_list = ['DefaultPermutationRotationIterator.java', 'TranscodeScheme.java', 'TransactionalLock.java']
+        error_list = ['DefaultPermutationRotationIterator.java', 'TranscodeScheme.java', 'TransactionalLock.java', 'package-info.java']
         if java_file in error_list:
             return False
         self.clear_self()
@@ -783,7 +783,7 @@ if __name__ == '__main__':
         file_num += 1
         print(f'开始解析第{file_num}个文件{subdir}')
 
-        if file_num < 4:
+        if file_num < 5:
             continue
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
         if os.path.isdir(f'{maindir}/{subdir}') or subdir.endswith('.java'):
