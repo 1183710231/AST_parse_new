@@ -5,10 +5,13 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import java.util.ArrayList;
+
 
 
 class AstToDot extends ClicyAction {
-	String dotfile;
+	private final String dotfile;
+	public List list = new ArrayList<>();
 	
 	AstToDot(String filename ){
         this.dotfile = filename + ".txt";

@@ -32,6 +32,11 @@ def log(say, path='./log.txt'):
     with open(path, 'a') as file:
         file.write(say + '\n')
 
+def get_pack_name(package_class_name):
+    class_name = package_class_name.split('.')[-1]
+    package_name = package_class_name.rstrip(class_name).rstrip('.')
+    return class_name, package_name
+
 
 class AST_parse():
     def __init__(self):
@@ -60,6 +65,9 @@ class AST_parse():
         self.pack_path_dict = dict()
         # 记录每个继承类的方法
         self.extend_class_methods = dict()
+        # TODO:文件路径是绝对路径，需要更改
+        # 格式{str:所在文件路径,[调用者，调用者所在类，所在包，方法名，提示词]}
+        self.tip_dict = dict()
 
     def clear_self(self):
         self.control_node_dict = dict()
@@ -95,7 +103,11 @@ class AST_parse():
                         # 提取导入类，并获得包信息
                         # TODO:含有内部类暂时删掉
                         if isinstance(node, Tree.CompilationUnit):
-                            inner_class = [inner_node for inner_node in node.children[-1][0].body if isinstance(inner_node, Tree.ClassDeclaration)]
+                            try:
+                                inner_class = [inner_node for inner_node in node.children[-1][0].body if isinstance(inner_node, Tree.ClassDeclaration)]
+                            except IndexError:
+                                print(f'文件{maindir}/{java_file}获取包内api时出现问题')
+                                break
                             if inner_class:
                                 break
                             if node.package:
@@ -103,16 +115,21 @@ class AST_parse():
                                 if not self.project_pack_dict.__contains__(pakage_name):
                                     self.project_pack_dict[pakage_name] = dict()
                                     self.pack_path_dict[pakage_name] = maindir
+                                elif self.pack_path_dict[pakage_name] != maindir:
+                                    self.pack_path_dict[f'{pakage_name}_2'] = maindir
                                 self.project_pack_dict[pakage_name][class_name] = list()
                             else:
                                 break
                         elif isinstance(node, Tree.InterfaceDeclaration):
                             break
                         elif isinstance(node, Tree.ClassDeclaration):
+                            # class_name = node.name
                             # 如果包含内部类的话
                             # TODO:内部类
                             if node.extends:
-                                self.extend_dict[f'{pakage_name}.{class_name}'] = f'{maindir}/{java_file}'
+                                # if(f'{pakage_name}.{class_name}' == 'org.apache.ambari.server.controller.metrics.MetricsDataTransferMethodFactory'):
+                                #     print('a')
+                                self.extend_dict[f'{pakage_name}.{node.name}'] = f'{maindir}/{java_file}'
 
                         elif isinstance(node, Tree.MethodDeclaration):
                             modifier_types = {'public', 'protected', 'private', 'default'}
@@ -122,16 +139,18 @@ class AST_parse():
                                 params.append(p.type.name)
                             if not m_type:
                                 m_type = 'default'
-                            try:
-                                # TODO:返回值和参数
-                                self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
-                                                                                        node.return_type.name if node.return_type else None, m_type])
-                            except UnboundLocalError as e:
-                                # 当java文件没有所在包时
-                                pakage_name = ''
-                                self.project_pack_dict[pakage_name] = dict()
+                            # try:
+                            # TODO:返回值和参数
+                            if not self.project_pack_dict[pakage_name].__contains__(class_name):
                                 self.project_pack_dict[pakage_name][class_name] = list()
-                                self.project_pack_dict[pakage_name][class_name].append([node.name, maindir])
+                            self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
+                                                                                    node.return_type.name if node.return_type else None, m_type])
+                            # except UnboundLocalError as e:
+                            #     # 当java文件没有所在包时
+                            #     pakage_name = ''
+                            #     self.project_pack_dict[pakage_name] = dict()
+                            #     self.project_pack_dict[pakage_name][class_name] = list()
+                            #     self.project_pack_dict[pakage_name][class_name].append([node.name, maindir])
 
     # 获得参数和返回值的所在包
     def get_re_param(self, dirname):
@@ -213,8 +232,9 @@ class AST_parse():
     def get_extend_pakage(self, package_class_name):
         if package_class_name == '':
             return []
-        class_name = package_class_name.split('.')[-1]
-        package_name = package_class_name.rstrip(class_name).rstrip('.')
+        class_name, package_name = get_pack_name(package_class_name)
+        # class_name = package_class_name.split('.')[-1]
+        # package_name = package_class_name.rstrip(class_name).rstrip('.')
         class_methods_list = list()
         if self.extend_class_methods.__contains__(package_class_name):
             return self.extend_class_methods.get(package_class_name)
@@ -231,7 +251,14 @@ class AST_parse():
         # 如果继承的是包内类
         elif not self.pack_path_dict.__contains__(package_name):
             return class_methods_list
+        # 为解决项目下有两个同名包
+
         apath = f'{self.pack_path_dict.get(package_name)}/{class_name}.java'
+        if not os.path.exists(apath):
+            package_name_2 = f'{package_name}_2'
+            apath = f'{self.pack_path_dict.get(package_name_2)}/{class_name}.java'
+        if not os.path.exists(apath):
+            return []
         # TODO:
         # try:
         #     f_input = open(apath, 'r', encoding='utf-8')
@@ -240,7 +267,10 @@ class AST_parse():
         # except:
         #     print(f'文件{apath}获取继承包信息时出现问题')
         #     return class_methods_list
+
+
         f_input = open(apath, 'r', encoding='utf-8')
+
         f_read = f_input.read()
         tree = javalang.parse.parse(f_read)
         # 分三级，0：同包方法，1：全路径引用，2：.*引用
@@ -267,7 +297,7 @@ class AST_parse():
                 import_dict[2].update(import_dict[0])
                 import_dict = import_dict[2]
 
-            elif isinstance(node, Tree.ClassDeclaration) and self.extend_dict.__contains__(f'{pakage_name}.{class_name}'):
+            elif isinstance(node, Tree.ClassDeclaration) and self.extend_dict.__contains__(f'{pakage_name}.{node.name}'):
                 extend_name = node.extends.name
                 extend_package_class_name = f'{import_dict.get(extend_name)}.{extend_name}'
                 self.extend_dict[package_class_name] = extend_package_class_name
@@ -342,7 +372,7 @@ class AST_parse():
         # undo 如果是两层掉用，则拿到第二层的变量
         # 如果不包含在self.var_dict中，说明不是标准库函数
         if hasattr(father_node, 'qualifier') and (self.var_dict.__contains__(father_node.qualifier)):
-            method_decs = self.get_overload_method(father_node)
+            package_class_name, method_decs = self.get_overload_method(father_node)
             if method_decs:
                 # TODO:返回值
                 if len(method_decs) == 4:
@@ -401,10 +431,12 @@ class AST_parse():
     def get_overload_method(self, node):
         try:
             var_name = node.qualifier
+            package_class_name = self.var_dict[var_name][0]
             method_list = self.var_dict[var_name][1]
             overload_method = [method for method in method_list if method[0] == node.member]
             # undo 当重叠调用时，参数包含MethodInvocation，和MemberReference两种
             # 当时内部函数时，暂时添加参数返回值，无法确认重载方法
+            # TODO
             if len(overload_method) > 0 and len(overload_method[0]) == 2:
                 right_method = overload_method[0]
             elif len(overload_method) > 1:
@@ -436,7 +468,7 @@ class AST_parse():
             else:
                 right_method = None
             # 返回类型：[方法名，[参数]，返回值]
-            return right_method
+            return package_class_name, right_method
         except TypeExceptin as e:
             print(e.str)
         except MethodNestingExceptin:
@@ -451,7 +483,7 @@ class AST_parse():
                     break
                 else:
                     right_method = None
-            return right_method
+            return package_class_name, right_method
         except BaseException:
             pass
 
@@ -521,9 +553,14 @@ class AST_parse():
         self.control_node_dict.clear()
         self.last_api = -1
 
+    def parse_java_file2(self, java_file, maindir):
+        java_type = ['byte[]', 'char', 'short', 'int', 'long', 'float', 'double', 'boolean']
+        self.clear_self()
+
 
     def parse_java_file(self, java_file, maindir):
         java_type = ['byte[]', 'char', 'short', 'int', 'long', 'float', 'double', 'boolean']
+        start_num = -1
         # TODO:没有解决内部类的问题，例：'E:/java_project/github_file_4/3d-bin-container-packing-master\\core\\src\\main\\java\\com\\github\\skjolber\\packing\\iterator\\DefaultPermutationRotationIterator.java'
         error_list = ['DefaultPermutationRotationIterator.java', 'TranscodeScheme.java', 'TransactionalLock.java', 'package-info.java']
         if java_file in error_list:
@@ -544,6 +581,7 @@ class AST_parse():
             return False
         f_input.seek(0)
         lines = f_input.readlines()
+        self.tip_dict[f'{maindir}/{java_file}'] = list()
         import_dict = [dict(), dict(), dict()]
         class_meths_dict = [dict(), dict(), dict()]
         for key, value in self.pack_dict.get('java.lang').items():
@@ -598,61 +636,33 @@ class AST_parse():
                 has_class = True
 
             elif isinstance(node, Tree.MethodDeclaration):
-                # if node.name == 'stop':
-                #     print('a')
-                if not self.api_desc == '':
-                    self.all_api_list.append(list(self.api_list))
-                    self.all_neighbor_dict.append(dict(self.neighbor_dict))
-                    # 把索引转为api，之所以用索引是因为api有重名的
-                    # undo 只有一个api调用的方法被舍弃
-                    if nx.nodes(self.G):
-                        for num_path in nx.all_simple_paths(self.G, source=0, target=len(self.G.nodes) - 1):
-                            api_path = list()
-                            for num_api in num_path:
-                                api_path.append(self.api_list[num_api])
-                            if self.all_desc_path.__contains__(self.api_desc):
-                                self.all_desc_path[self.api_desc].append(api_path)
-                                # TODO
-                                if len(self.all_desc_path[self.api_desc]) > 50:
-                                    break
-                            else:
-                                self.all_desc_path[self.api_desc] = [api_path]
+                # if node.documentation:
+                #     self.api_desc = node.documentation
+                # else:
+                start_num = -1
+                api_line = node.position.line - 2 - len(node.annotations)
+                find_start = False
+                # undo 如果该方法没有注释
+                if '*/' not in lines[api_line]:
+                    find_start = True
+                if '*/' in lines[api_line] and '/*' in lines[api_line]:
+                    find_start = True
+                    self.api_desc = lines[api_line].strip().strip('/').strip('*')
+                try:
+                    while (not find_start):
+                        if api_line > 20:
+                            s = lines[api_line - 20:api_line]
+                        else:
+                            s = lines[0:api_line]
+                        for i in range(1, 21):
+                            if '/*' in s[-i]:
+                                find_start = True
+                                start_num = api_line - i
+                                break
+                        api_line -= 20
+                except IndexError:
+                    start_num = -1
                     self.api_desc = ''
-                if node.documentation:
-                    self.api_desc = node.documentation
-                else:
-                    api_line = node.position.line - 2 - len(node.annotations)
-                    find_start = False
-                    # undo 如果该方法没有注释
-                    if '*/' not in lines[api_line]:
-                        find_start = True
-                    if '*/' in lines[api_line] and '/*' in lines[api_line]:
-                        find_start = True
-                        self.api_desc = lines[api_line].strip().strip('/').strip('*')
-                    try:
-                        while (not find_start):
-                            if api_line > 20:
-                                s = lines[api_line - 20:api_line]
-                            else:
-                                s = lines[0:api_line]
-                            for i in range(1, 21):
-                                if '/*' in s[-i]:
-                                    find_start = True
-                                    self.api_desc = str()
-                                    for j in range(1, i):
-                                        this_line = s[-(i - j)].strip().lstrip('*')
-                                        if this_line.startswith('TODO') or this_line.startswith(
-                                                '@param') or this_line.startswith('@return') or \
-                                                this_line.startswith('NOTE:') or this_line.startswith('test'):
-                                            break
-                                        if this_line.endswith('.'):
-                                            self.api_desc += this_line
-                                            break
-                                        self.api_desc += this_line
-                                    break
-                            api_line -= 20
-                    except IndexError:
-                        self.api_desc = ''
                 self.G.clear()
                 self.api_list.clear()
                 self.neighbor_dict.clear()
@@ -688,14 +698,20 @@ class AST_parse():
                 if class_meths_dict.__contains__(par_class_name):
                     self.var_dict[node.name] = [f'{pack_name}.{par_class_name}',
                                                 class_meths_dict.get(par_class_name)]
+
+            # 没有注释的要抛掉
             # 方法调用，须与变量名关联，变量名与类关联，类与包信息关联
-            elif isinstance(node, Tree.MethodInvocation) and not self.api_desc == '':
-                # if node.member == 'toString':
-                #     print('a')
+            elif isinstance(node, Tree.MethodInvocation) and start_num != -1:
+
+                tip_words = ''.join(lines[start_num: node.position.line-1])
+                # w = ''.join(lines[node.position.line][:node.position.column])
+                tip_words = tip_words + lines[node.position.line-1][:node.position.column]
                 if self.var_dict.__contains__(node.qualifier):
                     var_name = node.qualifier
-                    method_decs = self.get_overload_method(node)
+                    package_class_name, method_decs = self.get_overload_method(node)
+                    class_name, temp_package_name = get_pack_name(package_class_name)
                     if method_decs:
+                        self.tip_dict[f'{maindir}/{java_file}'].append([node.qualifier, package_class_name, self.pack_path_dict.get(temp_package_name), method_decs[0], tip_words])
                         if len(method_decs) == 4:
                             method_class = self.var_dict[var_name][0]
                             self.api_list.append(f'{method_class}.{method_decs[0]}({method_decs[1]})')
@@ -716,8 +732,8 @@ class AST_parse():
                             pass
 
                     var_father_return_class = self.get_father_return_class(path, node)
-                    # TODO:返回
                     if var_father_return_class:
+                        # TODO:这种情况还要加进去吗
                         # 当父节点方法返回值为None
                         if var_father_return_class == 'None.E':
                             self.api_list.append(f'E.{node.member}(UNKNOW)')
@@ -727,11 +743,14 @@ class AST_parse():
                             node.qualifier = var_father_return_class.split('.')[-1]
                             # 当父节点返回为正常类
                             if node.qualifier in import_dict.keys():
-                                method_decs = self.get_overload_method(node)
+                                package_class_name, method_decs = self.get_overload_method(node)
+                                class_name, temp_package_name = get_pack_name(package_class_name)
+                                # TODO:此处调用者用的是类名，因为是连续调用
                                 if method_decs:
-                                    self.api_list.append(
-                                        f'{var_father_return_class}.{method_decs[0]}({method_decs[1]})')
-                                    self.update_control_dict(path, node)
+                                    self.tip_dict[f'{maindir}/{java_file}'].append(
+                                        [node.qualifier, package_class_name, self.pack_path_dict.get(temp_package_name),
+                                         method_decs[0], tip_words])
+
 
     def parse(self, dirname):
 
@@ -783,11 +802,12 @@ if __name__ == '__main__':
         file_num += 1
         print(f'开始解析第{file_num}个文件{subdir}')
 
-        if file_num < 5:
+        if file_num < 10:
             continue
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
         if os.path.isdir(f'{maindir}/{subdir}') or subdir.endswith('.java'):
             my_parse.parse(f'{maindir}/{subdir}')
+    print('a')
 
 # undo UNKNOW 已解决
 # undo 两个局部变量名字一样怎么办 ,已解决
