@@ -53,15 +53,15 @@ class AST_parse():
         self.G = nx.Graph()
         self.all_desc_path = dict()
         self.api_desc = str()
-        # 存储所有项目内的api
+        # 存储所有项目内的api,TODO：替换键值,pack_name -> file_path
         self.project_pack_dict = dict()
-        # 存储项目内api的继承关系
+        # 存储项目内api的继承关系,TODO：替换键值,pack_name -> file_path
         self.extend_dict = dict()
         # 存储所有标准库api信息
         self.pack_dict = self.load_pkl('api2desc.pkl')
         # 存储所有类所导入的包
         self.class_extend_methods = dict()
-        # 记录每个包的路径
+        # 记录每个包的路径,TODO:删掉
         self.pack_path_dict = dict()
         # 记录每个继承类的方法
         self.extend_class_methods = dict()
@@ -109,25 +109,21 @@ class AST_parse():
                                 break
                             if node.package:
                                 pakage_name = node.package.name
-                                if not self.project_pack_dict.__contains__(pakage_name):
-                                    self.project_pack_dict[pakage_name] = dict()
-                                    self.pack_path_dict[pakage_name] = maindir
-                                # 防止同包名
-                                elif self.pack_path_dict[pakage_name] != maindir:
-                                    self.pack_path_dict[f'{pakage_name}_2'] = maindir
-                                self.project_pack_dict[pakage_name][class_name] = list()
+                                if not self.project_pack_dict.__contains__(maindir):
+                                    self.project_pack_dict[maindir] = dict()
+                                    # self.pack_path_dict[pakage_name] = maindir
                             else:
                                 break
-                        elif isinstance(node, Tree.InterfaceDeclaration):
+                        elif isinstance(node, Tree.InterfaceDeclaration) or isinstance(node, Tree.EnumDeclaration):
                             break
                         elif isinstance(node, Tree.ClassDeclaration):
-
+                            self.project_pack_dict[maindir][class_name] = list()
                             # 如果包含内部类的话
                             # TODO:内部类
                             if node.extends:
-                                if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
-                                    print('a')
-                                self.extend_dict[f'{pakage_name}.{node.name}'] = f'{maindir}/{java_file}'
+                                # if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
+                                #     print('a')
+                                self.extend_dict[f'{maindir}.{node.name}'] = f'{maindir}/{java_file}'
 
                         elif isinstance(node, Tree.MethodDeclaration):
                             modifier_types = {'public', 'protected', 'private', 'default'}
@@ -138,8 +134,8 @@ class AST_parse():
                             if not m_type:
                                 m_type = 'default'
                             # try:
-                                # TODO:返回值和参数
-                            self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
+                            # TODO:此处list第二项f'{maindir}/{class_name}'改为pakage_name
+                            self.project_pack_dict[maindir][class_name].append([node.name, pakage_name, params,
                                                                                     node.return_type.name if node.return_type else None, m_type])
                             # except UnboundLocalError as e:
                             #     # 当java文件没有所在包时
@@ -163,7 +159,7 @@ class AST_parse():
                     except:
                         print(f'文件{maindir}/{java_file}获取包内api时出现问题')
                         continue
-                    # TODO:extend
+                    # TODO:更改键值
                     import_dict = [dict(), dict(), dict()]
                     class_meths_dict = [dict(), dict(), dict()]
                     for key, value in self.pack_dict.get('java.lang').items():
@@ -180,24 +176,25 @@ class AST_parse():
                             # 提取导入类，并获得包信息
                             if node.package:
                                 package_name = node.package.name
-                                pakage_inside_class = self.project_pack_dict.get(node.package.name)
+                                pakage_inside_class = self.project_pack_dict.get(maindir)
                                 for key, value in pakage_inside_class.items():
                                     class_meths_dict[0][key] = [method for method in value if
                                                                 not method[-1] in ['private', 'father_project']]
                                 for temp_class_name in pakage_inside_class.keys():
-                                    import_dict[0][temp_class_name] = node.package.name
+                                    import_dict[0][temp_class_name] = maindir
                             else:
                                 break
                             # Import完成后，去除同名方法
                             if node.imports:
                                 for import_node in node.imports:
                                     class_meths_dict, import_dict = self.parse_import_node(class_meths_dict,
-                                                                                           import_dict, import_node)
+                                                                                           import_dict, import_node, maindir)
                             class_meths_dict[2].update(class_meths_dict[1])
                             class_meths_dict[2].update(class_meths_dict[0])
                             class_meths_dict = class_meths_dict[2]
                             import_dict[2].update(import_dict[1])
                             import_dict[2].update(import_dict[0])
+                            # TODO:更改键值
                             import_dict = import_dict[2]
                         elif isinstance(node, Tree.InterfaceDeclaration) or isinstance(node, Tree.EnumDeclaration):
                             break
@@ -321,17 +318,17 @@ class AST_parse():
             self.extend_class_methods[package_class_name] = self.get_extend_pakage(package_class_name)
 
 
-    def parse_import_node(self, class_meths_dict, import_dict, node):
+    def parse_import_node(self, class_meths_dict, import_dict, node, maindir):
         # undo .*情况node.path没有*
         # class_pack_dict   类名 -》 [包和[所有方法[方法名，参数（可能为none），返回值（可能为void）]]]
         # 需要判断该引用是否是标准库
-        if self.project_pack_dict.__contains__(node.path):
-            pack_contain_class = self.project_pack_dict.get(node.path)
+        if self.project_pack_dict.__contains__(maindir):
+            pack_contain_class = self.project_pack_dict.get(maindir)
             # class_meths_dict[2].update(pack_contain_class)
             for key, value in pack_contain_class.items():
                 class_meths_dict[2][key] = [method_decs for method_decs in value if method_decs[-1] == 'public']
             for class_name in pack_contain_class.keys():
-                import_dict[2][class_name] = node.path
+                import_dict[2][class_name] = maindir
 
         elif self.pack_dict.__contains__(node.path):
             pack_contain_class = self.pack_dict.get(node.path)
