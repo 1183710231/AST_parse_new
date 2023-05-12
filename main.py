@@ -32,6 +32,11 @@ def log(say, path='./log.txt'):
     with open(path, 'a') as file:
         file.write(say + '\n')
 
+def get_pack_name(package_class_name):
+    class_name = package_class_name.split('.')[-1]
+    package_name = package_class_name.rstrip(class_name).rstrip('.')
+    return class_name, package_name
+
 
 class AST_parse():
     def __init__(self):
@@ -95,7 +100,11 @@ class AST_parse():
                         # 提取导入类，并获得包信息
                         # TODO:含有内部类暂时删掉
                         if isinstance(node, Tree.CompilationUnit):
-                            inner_class = [inner_node for inner_node in node.children[-1][0].body if isinstance(inner_node, Tree.ClassDeclaration)]
+                            try:
+                                inner_class = [inner_node for inner_node in node.children[-1][0].body if isinstance(inner_node, Tree.ClassDeclaration)]
+                            except IndexError:
+                                print(f'文件{maindir}/{java_file}获取包内api时出现问题')
+                                break
                             if inner_class:
                                 break
                             if node.package:
@@ -103,16 +112,22 @@ class AST_parse():
                                 if not self.project_pack_dict.__contains__(pakage_name):
                                     self.project_pack_dict[pakage_name] = dict()
                                     self.pack_path_dict[pakage_name] = maindir
+                                # 防止同包名
+                                elif self.pack_path_dict[pakage_name] != maindir:
+                                    self.pack_path_dict[f'{pakage_name}_2'] = maindir
                                 self.project_pack_dict[pakage_name][class_name] = list()
                             else:
                                 break
                         elif isinstance(node, Tree.InterfaceDeclaration):
                             break
                         elif isinstance(node, Tree.ClassDeclaration):
+
                             # 如果包含内部类的话
                             # TODO:内部类
                             if node.extends:
-                                self.extend_dict[f'{pakage_name}.{class_name}'] = f'{maindir}/{java_file}'
+                                if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
+                                    print('a')
+                                self.extend_dict[f'{pakage_name}.{node.name}'] = f'{maindir}/{java_file}'
 
                         elif isinstance(node, Tree.MethodDeclaration):
                             modifier_types = {'public', 'protected', 'private', 'default'}
@@ -122,16 +137,16 @@ class AST_parse():
                                 params.append(p.type.name)
                             if not m_type:
                                 m_type = 'default'
-                            try:
+                            # try:
                                 # TODO:返回值和参数
-                                self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
-                                                                                        node.return_type.name if node.return_type else None, m_type])
-                            except UnboundLocalError as e:
-                                # 当java文件没有所在包时
-                                pakage_name = ''
-                                self.project_pack_dict[pakage_name] = dict()
-                                self.project_pack_dict[pakage_name][class_name] = list()
-                                self.project_pack_dict[pakage_name][class_name].append([node.name, maindir])
+                            self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
+                                                                                    node.return_type.name if node.return_type else None, m_type])
+                            # except UnboundLocalError as e:
+                            #     # 当java文件没有所在包时
+                            #     pakage_name = ''
+                            #     self.project_pack_dict[pakage_name] = dict()
+                            #     self.project_pack_dict[pakage_name][class_name] = list()
+                            #     self.project_pack_dict[pakage_name][class_name].append([node.name, maindir])
 
     # 获得参数和返回值的所在包
     def get_re_param(self, dirname):
@@ -213,8 +228,9 @@ class AST_parse():
     def get_extend_pakage(self, package_class_name):
         if package_class_name == '':
             return []
-        class_name = package_class_name.split('.')[-1]
-        package_name = package_class_name.rstrip(class_name).rstrip('.')
+        class_name, package_name = get_pack_name(package_class_name)
+        # class_name = package_class_name.split('.')[-1]
+        # package_name = package_class_name.rstrip(class_name).rstrip('.')
         class_methods_list = list()
         if self.extend_class_methods.__contains__(package_class_name):
             return self.extend_class_methods.get(package_class_name)
@@ -231,7 +247,14 @@ class AST_parse():
         # 如果继承的是包内类
         elif not self.pack_path_dict.__contains__(package_name):
             return class_methods_list
+        # 为解决项目下有两个同名包
+
         apath = f'{self.pack_path_dict.get(package_name)}/{class_name}.java'
+        if not os.path.exists(apath):
+            package_name_2 = f'{package_name}_2'
+            apath = f'{self.pack_path_dict.get(package_name_2)}/{class_name}.java'
+        if not os.path.exists(apath):
+            return []
         # TODO:
         # try:
         #     f_input = open(apath, 'r', encoding='utf-8')
@@ -267,7 +290,7 @@ class AST_parse():
                 import_dict[2].update(import_dict[0])
                 import_dict = import_dict[2]
 
-            elif isinstance(node, Tree.ClassDeclaration) and self.extend_dict.__contains__(f'{pakage_name}.{class_name}'):
+            elif isinstance(node, Tree.ClassDeclaration) and self.extend_dict.__contains__(f'{pakage_name}.{node.name}'):
                 extend_name = node.extends.name
                 extend_package_class_name = f'{import_dict.get(extend_name)}.{extend_name}'
                 self.extend_dict[package_class_name] = extend_package_class_name
@@ -550,7 +573,7 @@ class AST_parse():
             class_meths_dict[2][key] = [method for method in value if method[-1] == 'public']
         for temp_class_name in class_meths_dict[2].keys():
             import_dict[2][temp_class_name] = 'java.lang'
-        print(apath)
+        # print(apath)
         # if apath == 'E:/java_project/github_file/ambari-trunk\\ambari-server\\package-info.java':
         #     print('a')
         for path, node in tree:
@@ -744,11 +767,11 @@ class AST_parse():
             for java_file in file_name_list:
                 # try:
                 if java_file.endswith('.java'):
-                    # try:
-                    #     self.parse_java_file(java_file, maindir)
-                    # except:
-                    #     pass
-                    self.parse_java_file(java_file, maindir)
+                    try:
+                        self.parse_java_file(java_file, maindir)
+                    except:
+                        pass
+                    # self.parse_java_file(java_file, maindir)
 
         self.dump_pkl_notCover('desc_path_dict_2.pkl', self.all_desc_path)
         print(f'新增{len(self.all_desc_path)}条数据')
@@ -783,7 +806,7 @@ if __name__ == '__main__':
         file_num += 1
         print(f'开始解析第{file_num}个文件{subdir}')
 
-        if file_num < 5:
+        if file_num < 2:
             continue
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
         if os.path.isdir(f'{maindir}/{subdir}') or subdir.endswith('.java'):
