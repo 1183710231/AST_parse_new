@@ -47,11 +47,11 @@ class AST_parse():
         self.last_api = -1
         self.now_api = None
         self.neighbor_dict = dict()
-        self.all_neighbor_dict = list()
+        # self.all_neighbor_dict = list()
         self.api_list = list()
-        self.all_api_list = list()
+        # self.all_api_list = list()
         self.G = nx.Graph()
-        self.all_desc_path = dict()
+        # self.all_desc_path = dict()
         self.api_desc = str()
         # 存储所有项目内的api
         self.project_pack_dict = dict()
@@ -96,7 +96,7 @@ class AST_parse():
                         f_read = f_input.read()
                         tree = javalang.parse.parse(f_read)
                     except:
-                        print(f'文件{maindir}/{java_file}获取包内api时出现问题')
+                        print(f'文件{maindir}/{java_file}无法解析 ')
                         continue
 
                     for path, node in tree:
@@ -123,7 +123,7 @@ class AST_parse():
                         elif isinstance(node, Tree.InterfaceDeclaration):
                             break
                         elif isinstance(node, Tree.ClassDeclaration):
-                            # class_name = node.name
+
                             # 如果包含内部类的话
                             # TODO:内部类
                             if node.extends:
@@ -165,7 +165,7 @@ class AST_parse():
                         f_read = f_input.read()
                         tree = javalang.parse.parse(f_read)
                     except:
-                        print(f'文件{maindir}/{java_file}获取包内api时出现问题')
+                        print(f'文件{maindir}/{java_file}获取返回值参数时')
                         continue
                     # TODO:extend
                     import_dict = [dict(), dict(), dict()]
@@ -177,8 +177,11 @@ class AST_parse():
                     for path, node in tree:
                         if isinstance(node, Tree.CompilationUnit):
                             # TODO:内部类暂时删掉
-                            inner_class = [inner_node for inner_node in node.children[-1][0].body if
-                                           isinstance(inner_node, Tree.ClassDeclaration)]
+                            try:
+                                inner_class = [inner_node for inner_node in node.children[-1][0].body if
+                                               isinstance(inner_node, Tree.ClassDeclaration)]
+                            except:
+                                break
                             if inner_class:
                                 break
                             # 提取导入类，并获得包信息
@@ -267,10 +270,7 @@ class AST_parse():
         # except:
         #     print(f'文件{apath}获取继承包信息时出现问题')
         #     return class_methods_list
-
-
         f_input = open(apath, 'r', encoding='utf-8')
-
         f_read = f_input.read()
         tree = javalang.parse.parse(f_read)
         # 分三级，0：同包方法，1：全路径引用，2：.*引用
@@ -285,8 +285,11 @@ class AST_parse():
                 if node.package:
                     pakage_name = node.package.name
                     pakage_inside_class = self.project_pack_dict.get(node.package.name)
-                    for name in pakage_inside_class.keys():
-                        import_dict[0][name] = node.package.name
+                    try:
+                        for name in pakage_inside_class.keys():
+                            import_dict[0][name] = node.package.name
+                    except:
+                        pass
                 else:
                     break
                 if node.imports:
@@ -298,7 +301,11 @@ class AST_parse():
                 import_dict = import_dict[2]
 
             elif isinstance(node, Tree.ClassDeclaration) and self.extend_dict.__contains__(f'{pakage_name}.{node.name}'):
-                extend_name = node.extends.name
+                try:
+                    extend_name = node.extends.name
+                except:
+                    # TODO:同包名同类名
+                    return []
                 extend_package_class_name = f'{import_dict.get(extend_name)}.{extend_name}'
                 self.extend_dict[package_class_name] = extend_package_class_name
         # 将本class中的方法加入,如果包含内部类则舍弃
@@ -324,8 +331,13 @@ class AST_parse():
 
 
     def get_extend_methods(self):
-        for package_class_name, apath in self.extend_dict.items():
-            self.extend_class_methods[package_class_name] = self.get_extend_pakage(package_class_name)
+        # for package_class_name, apath in self.extend_dict.items():
+        for package_class_name in list(self.extend_dict.keys()):
+            # apath = self.extend_dict.get(package_class_name)
+            try:
+                self.extend_class_methods[package_class_name] = self.get_extend_pakage(package_class_name)
+            except:
+                pass
 
 
     def parse_import_node(self, class_meths_dict, import_dict, node):
@@ -553,10 +565,6 @@ class AST_parse():
         self.control_node_dict.clear()
         self.last_api = -1
 
-    def parse_java_file2(self, java_file, maindir):
-        java_type = ['byte[]', 'char', 'short', 'int', 'long', 'float', 'double', 'boolean']
-        self.clear_self()
-
 
     def parse_java_file(self, java_file, maindir):
         java_type = ['byte[]', 'char', 'short', 'int', 'long', 'float', 'double', 'boolean']
@@ -581,14 +589,14 @@ class AST_parse():
             return False
         f_input.seek(0)
         lines = f_input.readlines()
-        self.tip_dict[f'{maindir}/{java_file}'] = list()
+
         import_dict = [dict(), dict(), dict()]
         class_meths_dict = [dict(), dict(), dict()]
         for key, value in self.pack_dict.get('java.lang').items():
             class_meths_dict[2][key] = [method for method in value if method[-1] == 'public']
         for temp_class_name in class_meths_dict[2].keys():
             import_dict[2][temp_class_name] = 'java.lang'
-        print(apath)
+        # print(apath)
         # if apath == 'E:/java_project/github_file/ambari-trunk\\ambari-server\\package-info.java':
         #     print('a')
         for path, node in tree:
@@ -684,8 +692,8 @@ class AST_parse():
                     path_len -= 1
                 var_class_name = path[path_len].type.name
                 if class_meths_dict.__contains__(var_class_name):
-                    pack_name = import_dict.get(var_class_name)
-                    self.var_dict[node.name] = [f'{pack_name}.{var_class_name}',
+                    temp_pack_name = import_dict.get(var_class_name)
+                    self.var_dict[node.name] = [f'{temp_pack_name}.{var_class_name}',
                                                 class_meths_dict.get(var_class_name)]
                 # 在这里加入java基本类型变量，为参数判断准备
                 if var_class_name in java_type:
@@ -694,30 +702,25 @@ class AST_parse():
             # 形参，获取变量名及类
             elif isinstance(node, Tree.FormalParameter) and not self.api_desc == '':
                 par_class_name = node.type.name
-                pack_name = import_dict.get(par_class_name)
+                temp_pack_name = import_dict.get(par_class_name)
                 if class_meths_dict.__contains__(par_class_name):
-                    self.var_dict[node.name] = [f'{pack_name}.{par_class_name}',
+                    self.var_dict[node.name] = [f'{temp_pack_name}.{par_class_name}',
                                                 class_meths_dict.get(par_class_name)]
 
             # 没有注释的要抛掉
             # 方法调用，须与变量名关联，变量名与类关联，类与包信息关联
             elif isinstance(node, Tree.MethodInvocation) and start_num != -1:
-
+                if not self.tip_dict.__contains__(f'{maindir}/{java_file}'):
+                    self.tip_dict[f'{maindir}/{java_file}'] = list()
                 tip_words = ''.join(lines[start_num: node.position.line-1])
                 # w = ''.join(lines[node.position.line][:node.position.column])
-                tip_words = tip_words + lines[node.position.line-1][:node.position.column]
+                tip_words = tip_words + lines[node.position.line-1][:node.position.column - 1]
                 if self.var_dict.__contains__(node.qualifier):
-                    var_name = node.qualifier
+                    # var_name = node.qualifier
                     package_class_name, method_decs = self.get_overload_method(node)
-                    class_name, temp_package_name = get_pack_name(package_class_name)
+                    temp_class_name, temp_package_name = get_pack_name(package_class_name)
                     if method_decs:
                         self.tip_dict[f'{maindir}/{java_file}'].append([node.qualifier, package_class_name, self.pack_path_dict.get(temp_package_name), method_decs[0], tip_words])
-                        if len(method_decs) == 4:
-                            method_class = self.var_dict[var_name][0]
-                            self.api_list.append(f'{method_class}.{method_decs[0]}({method_decs[1]})')
-                        if len(method_decs) == 5:
-                            self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
-                        self.update_control_dict(path, node)
                 # 当连续调用
                 elif not node.qualifier:
                     # 如果是调用本类方法
@@ -725,8 +728,12 @@ class AST_parse():
                         try:
                             method_decs = [method for method in this_class_methods if method[0] == node.member][0]
                             if method_decs:
-                                self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
-                                self.update_control_dict(path, node)
+
+                                self.tip_dict[f'{maindir}/{java_file}'].append(
+                                    [None, f'{package_name}.{class_name}', self.pack_path_dict.get(package_name),
+                                     method_decs[0], tip_words])
+                                # self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
+                                # self.update_control_dict(path, node)
                                 continue
                         except:
                             pass
@@ -735,11 +742,11 @@ class AST_parse():
                     if var_father_return_class:
                         # TODO:这种情况还要加进去吗
                         # 当父节点方法返回值为None
-                        if var_father_return_class == 'None.E':
-                            self.api_list.append(f'E.{node.member}(UNKNOW)')
-                            self.update_control_dict(path, node)
-                        # 当父节点返回为正常类
-                        else:
+                        if not var_father_return_class == 'None.E':
+                        #     self.api_list.append(f'E.{node.member}(UNKNOW)')
+                        #     self.update_control_dict(path, node)
+                        # # 当父节点返回为正常类
+                        # else:
                             node.qualifier = var_father_return_class.split('.')[-1]
                             # 当父节点返回为正常类
                             if node.qualifier in import_dict.keys():
@@ -753,7 +760,7 @@ class AST_parse():
 
 
     def parse(self, dirname):
-
+        self.while_load_pkl('tip_dict.pkl')
         self.get_project_api(dirname)
         self.get_extend_methods()
         self.get_re_param(dirname)
@@ -763,16 +770,17 @@ class AST_parse():
             for java_file in file_name_list:
                 # try:
                 if java_file.endswith('.java'):
-                    # try:
-                    #     self.parse_java_file(java_file, maindir)
-                    # except:
-                    #     pass
-                    self.parse_java_file(java_file, maindir)
-
-        self.dump_pkl_notCover('desc_path_dict_2.pkl', self.all_desc_path)
-        print(f'新增{len(self.all_desc_path)}条数据')
-        self.dump_pkl_notCover('graph.pkl', self.all_api_list)
-        self.dump_pkl_notCover('graph.pkl', self.all_neighbor_dict)
+                    try:
+                        self.parse_java_file(java_file, maindir)
+                    except:
+                        pass
+                    # self.parse_java_file(java_file, maindir)
+        self.dump_pkl_notCover('tip_dict.pkl', self.tip_dict)
+        print(f'新增{len(self.tip_dict)}条数据')
+        # self.dump_pkl_notCover('desc_path_dict_2.pkl', self.all_desc_path)
+        # print(f'新增{len(self.all_desc_path)}条数据')
+        # self.dump_pkl_notCover('graph.pkl', self.all_api_list)
+        # self.dump_pkl_notCover('graph.pkl', self.all_neighbor_dict)
 
         # file_handle.close()
 
@@ -791,6 +799,7 @@ if __name__ == '__main__':
     # my_parse.parse('spring-session-core')
 
     # 处理github项目
+
     file_num = 0
     maindir = 'E:/java_project/github_file'
     # maindir = 'C:/Users/wkr/Desktop/项目/AST_parse_new/clicy-master'
@@ -802,8 +811,8 @@ if __name__ == '__main__':
         file_num += 1
         print(f'开始解析第{file_num}个文件{subdir}')
 
-        if file_num < 10:
-            continue
+        # if file_num < 10:
+        #     continue
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
         if os.path.isdir(f'{maindir}/{subdir}') or subdir.endswith('.java'):
             my_parse.parse(f'{maindir}/{subdir}')
