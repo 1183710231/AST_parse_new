@@ -6,7 +6,10 @@ import os, pickle
 import re
 import networkx as nx
 import time
+import sys
 
+
+sys.setrecursionlimit(4000)
 
 class TypeExceptin(Exception):
     "this is user's Exception for check the length of name "
@@ -84,16 +87,17 @@ class AST_parse():
             for java_file in file_name_list:
                 if java_file.endswith('.java'):
                     apath = os.path.join(maindir, java_file)
+                    # print(apath)
 
                     class_name = java_file.rstrip('java').rstrip('.')
-                    # if class_name == 'ControlHandler':
-                    #     print('a')
+                    if class_name == 'Parser':
+                        print('a')
                     try:
                         f_input = open(apath, 'r', encoding='utf-8')
                         f_read = f_input.read()
                         tree = javalang.parse.parse(f_read)
                     except:
-                        print(f'文件{maindir}/{java_file}获取包内api时出现问题')
+                        print(f'文件{maindir}/{java_file}无法解析 ')
                         continue
 
                     for path, node in tree:
@@ -125,8 +129,8 @@ class AST_parse():
                             # 如果包含内部类的话
                             # TODO:内部类
                             if node.extends:
-                                if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
-                                    print('a')
+                                # if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
+                                #     print('a')
                                 self.extend_dict[f'{pakage_name}.{node.name}'] = f'{maindir}/{java_file}'
 
                         elif isinstance(node, Tree.MethodDeclaration):
@@ -154,14 +158,14 @@ class AST_parse():
             for java_file in file_name_list:
                 if java_file.endswith('.java'):
                     apath = os.path.join(maindir, java_file)
-
+                    # print(apath)
                     class_name = java_file.rstrip('java').rstrip('.')
                     try:
                         f_input = open(apath, 'r', encoding='utf-8')
                         f_read = f_input.read()
                         tree = javalang.parse.parse(f_read)
                     except:
-                        print(f'文件{maindir}/{java_file}获取包内api时出现问题')
+                        print(f'文件{maindir}/{java_file}获取返回值参数时')
                         continue
                     # TODO:extend
                     import_dict = [dict(), dict(), dict()]
@@ -173,8 +177,11 @@ class AST_parse():
                     for path, node in tree:
                         if isinstance(node, Tree.CompilationUnit):
                             # TODO:内部类暂时删掉
-                            inner_class = [inner_node for inner_node in node.children[-1][0].body if
-                                           isinstance(inner_node, Tree.ClassDeclaration)]
+                            try:
+                                inner_class = [inner_node for inner_node in node.children[-1][0].body if
+                                               isinstance(inner_node, Tree.ClassDeclaration)]
+                            except:
+                                break
                             if inner_class:
                                 break
                             # 提取导入类，并获得包信息
@@ -226,6 +233,9 @@ class AST_parse():
 
     # TODO:会出现包名重复的问题
     def get_extend_pakage(self, package_class_name):
+        # if package_class_name == 'org.apache.camel.routepolicy.quartz.SpringCronScheduledRoutePolicyTest':
+        #     print('a')
+        # print(package_class_name)
         if package_class_name == '':
             return []
         class_name, package_name = get_pack_name(package_class_name)
@@ -278,8 +288,11 @@ class AST_parse():
                 if node.package:
                     pakage_name = node.package.name
                     pakage_inside_class = self.project_pack_dict.get(node.package.name)
-                    for name in pakage_inside_class.keys():
-                        import_dict[0][name] = node.package.name
+                    try:
+                        for name in pakage_inside_class.keys():
+                            import_dict[0][name] = node.package.name
+                    except:
+                        pass
                 else:
                     break
                 if node.imports:
@@ -291,9 +304,14 @@ class AST_parse():
                 import_dict = import_dict[2]
 
             elif isinstance(node, Tree.ClassDeclaration) and self.extend_dict.__contains__(f'{pakage_name}.{node.name}'):
-                extend_name = node.extends.name
+                try:
+                    extend_name = node.extends.name
+                except:
+                    # TODO:同包名同类名
+                    return []
                 extend_package_class_name = f'{import_dict.get(extend_name)}.{extend_name}'
                 self.extend_dict[package_class_name] = extend_package_class_name
+                break
         # 将本class中的方法加入,如果包含内部类则舍弃
         try:
             class_methods_list.extend(self.project_pack_dict.get(package_name).get(class_name))
@@ -317,8 +335,13 @@ class AST_parse():
 
 
     def get_extend_methods(self):
-        for package_class_name, apath in self.extend_dict.items():
-            self.extend_class_methods[package_class_name] = self.get_extend_pakage(package_class_name)
+        # for package_class_name, apath in self.extend_dict.items():
+        for package_class_name in list(self.extend_dict.keys()):
+            # apath = self.extend_dict.get(package_class_name)
+            try:
+                self.extend_class_methods[package_class_name] = self.get_extend_pakage(package_class_name)
+            except:
+                pass
 
 
     def parse_import_node(self, class_meths_dict, import_dict, node):
@@ -806,7 +829,7 @@ if __name__ == '__main__':
         file_num += 1
         print(f'开始解析第{file_num}个文件{subdir}')
 
-        if file_num < 2:
+        if file_num < 225:
             continue
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
         if os.path.isdir(f'{maindir}/{subdir}') or subdir.endswith('.java'):
