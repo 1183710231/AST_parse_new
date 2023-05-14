@@ -95,9 +95,13 @@ class AST_parse():
                     try:
                         f_input = open(apath, 'r', encoding='utf-8')
                         f_read = f_input.read()
+                    except:
+                        print(f'文件{maindir}/{java_file}获得初步api时读取失败 ')
+                        continue
+                    try:
                         tree = javalang.parse.parse(f_read)
                     except:
-                        print(f'文件{maindir}/{java_file}无法解析 ')
+                        print(f'文件{maindir}/{java_file}获得初步api时无法解析 ')
                         continue
 
                     for path, node in tree:
@@ -163,9 +167,12 @@ class AST_parse():
                     try:
                         f_input = open(apath, 'r', encoding='utf-8')
                         f_read = f_input.read()
+                    except:
+                        print(f'文件{maindir}/{java_file}获取返回值参数时读取文件失败')
+                    try:
                         tree = javalang.parse.parse(f_read)
                     except:
-                        print(f'文件{maindir}/{java_file}获取返回值参数时')
+                        print(f'文件{maindir}/{java_file}获取返回值参数时解析文件失败')
                         continue
                     # TODO:extend
                     import_dict = [dict(), dict(), dict()]
@@ -584,9 +591,13 @@ class AST_parse():
         try:
             f_input = open(apath, 'r', encoding='utf-8')
             f_read = f_input.read()
+        except:
+            print(f'文件{maindir}/{java_file}获得api序列时无法读取文件')
+            return False
+        try:
             tree = javalang.parse.parse(f_read)
         except:
-            print(f'文件{maindir}/{java_file}解析java文件时出现问题')
+            print(f'文件{maindir}/{java_file}获得api序列时解析失败')
             return False
         f_input.seek(0)
         lines = f_input.readlines()
@@ -780,7 +791,7 @@ class AST_parse():
                                     self.update_control_dict(path, node)
 
     def parse(self, dirname):
-
+        # self.while_load_pkl('desc_path_dict_2.pkl')
         self.get_project_api(dirname)
         self.get_extend_methods()
         self.get_re_param(dirname)
@@ -825,11 +836,13 @@ if __name__ == '__main__':
     write_file('log.txt', f'正在解析{maindir}')
     file_list = os.listdir(maindir)
     for subdir in file_list:
+        if subdir == 'loom-fibers':
+            print('a')
         my_parse = AST_parse()
         file_num += 1
         print(f'开始解析第{file_num}个文件{subdir}')
 
-        if file_num < 225:
+        if file_num < 258:
             continue
         print('当前时间为：{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))))
         if os.path.isdir(f'{maindir}/{subdir}') or subdir.endswith('.java'):

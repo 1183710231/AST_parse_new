@@ -24,7 +24,7 @@ public class Activator extends AstToDot {
 	public Activator() {
 		plugin = this;
 	}
-    public class Draw {//内部类
+    public class Draw extends AstToDot{//内部类
         public void drawSahpe() {
           System.out.println(radius);//外部类的private成员
           System.out.prinlt(count);//外部类的静态成员
