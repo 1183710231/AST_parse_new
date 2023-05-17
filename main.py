@@ -81,6 +81,7 @@ class AST_parse():
         self.all_api_list = list()
         self.api_desc = str()
 
+    # 获得类及内部类中的方法
     def processing_project_api_nodes(self, tree, class_name, pakage_name = ''):
         out_class = []
         inner_class = []
@@ -108,7 +109,16 @@ class AST_parse():
                     self.project_pack_dict[pakage_name][class_name] = list()
                 else:
                     break
-            elif isinstance(node, Tree.InterfaceDeclaration):
+
+            elif isinstance(node, Tree.ConstructorDeclaration):
+                params = list()
+                for p in node.parameters:
+                    params.append(p.type.name)
+                if not self.project_pack_dict[pakage_name].__contains__(class_name):
+                    self.project_pack_dict[pakage_name][class_name] = list()
+                self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
+                                                                        None, 'public'])
+            elif isinstance(node, Tree.InterfaceDeclaration) or isinstance(node, Tree.EnumDeclaration):
                 break
             elif isinstance(node, Tree.ClassDeclaration):
                 # 如果包含内部类的话
@@ -117,11 +127,19 @@ class AST_parse():
                     self.processing_project_api_nodes(node, f'{class_name}*{node.name}', pakage_name)
                 elif node in out_class:
                     self.processing_project_api_nodes(node, node.name, pakage_name)
-
-                elif node.extends:
-                    # if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
-                    #     print('a')
-                    self.extend_dict[f'{pakage_name}.{class_name}'] = f'{maindir}/{class_name}.java'
+                else:
+                    # 如果没有构造器加入一个构造器方法
+                    constructors = [constructor for constructor in node.body if isinstance(node, Tree.ConstructorDeclaration)]
+                    if not constructors:
+                        if not self.project_pack_dict[pakage_name].__contains__(class_name):
+                            self.project_pack_dict[pakage_name][class_name] = list()
+                        # TODO:路径该怎么写
+                        self.project_pack_dict[pakage_name][class_name].append(
+                            [node.name, f'{maindir}/{class_name}', [], None, 'public'])
+                    if node.extends:
+                        # if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
+                        #     print('a')
+                        self.extend_dict[f'{pakage_name}.{class_name}'] = f'{maindir}/{class_name}.java'
 
             # elif isinstance(node, Tree.LocalVariableDeclaration):
             #     print('a')
@@ -140,6 +158,7 @@ class AST_parse():
                 self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
                                                                         node.return_type.name if node.return_type else None,
                                                                         m_type])
+
 
     def get_project_api(self, dirname):
 
@@ -228,7 +247,30 @@ class AST_parse():
                             import_dict = import_dict[2]
                         elif isinstance(node, Tree.InterfaceDeclaration) or isinstance(node, Tree.EnumDeclaration):
                             break
+                        # elif isinstance(node, Tree.ConstructorDeclaration):
+                        #     if other_class in vars() and node in other_class.body:
+                        #         temp_class_name = other_class_name
+                        #     else:
+                        #         temp_class_name = class_name
+                        #     params = list()
+                        #     for p in node.parameters:
+                        #         params.append(p.type.name)
+                        #     all_method_list = self.project_pack_dict.get(package_name).get(temp_class_name)
+                        #     for i in range(len(all_method_list)):
+                        #         if all_method_list[i][0] == node.name and all_method_list[i][2] == params and \
+                        #                 all_method_list[i][3] == None:
+                        #             params.clear()
+                        #             for p in node.parameters:
+                        #                 params.append(f'{import_dict.get(p.type.name)}.{p.type.name}')
+                        #             if return_type:
+                        #                 self.project_pack_dict.get(package_name).get(temp_class_name)[i][
+                        #                     3] = f'{import_dict.get(return_type)}.{return_type}'
+                        #             self.project_pack_dict.get(package_name).get(temp_class_name)[i][
+                        #                 2] = params
+                        #             break
+
                         elif isinstance(node, Tree.ClassDeclaration):
+                            other_class = None
                             if node in inner_class:
                                 other_class = node
                                 other_class_name = f'{class_name}*{node.name}'
@@ -236,30 +278,32 @@ class AST_parse():
                                 other_class = node
                                 other_class_name = node.name
 
-                        elif isinstance(node, Tree.MethodDeclaration):
-                            if other_class in vars() and node in other_class.body:
+                        elif isinstance(node, Tree.MethodDeclaration) or isinstance(node, Tree.ConstructorDeclaration):
+                            if other_class and node in other_class.body:
                                 temp_class_name = other_class_name
                             else:
                                 temp_class_name = class_name
                             params = list()
                             for p in node.parameters:
                                 params.append(p.type.name)
-                            return_type = node.return_type.name if node.return_type else None
+                            if isinstance(node, Tree.ConstructorDeclaration):
+                                return_type = None
+                            else:
+                                return_type = node.return_type.name if node.return_type else None
                             all_method_list = self.project_pack_dict.get(package_name).get(temp_class_name)
-                            method_num = -1
                             for i in range(len(all_method_list)):
                                 if all_method_list[i][0] == node.name and all_method_list[i][2] == params and all_method_list[i][3] == return_type:
-                                    method_num = i
+                                    params.clear()
+                                    for p in node.parameters:
+                                        params.append(f'{import_dict.get(p.type.name)}.{p.type.name}')
+                                    if return_type:
+                                        self.project_pack_dict.get(package_name).get(temp_class_name)[i][
+                                            3] = f'{import_dict.get(return_type)}.{return_type}'
+                                    self.project_pack_dict.get(package_name).get(temp_class_name)[i][
+                                        2] = params
                                     break
-                            params.clear()
-                            # TODO:健壮性
-                            if method_num != -1:
-                                for p in node.parameters:
-                                    params.append(f'{import_dict.get(p.type.name)}.{p.type.name}')
-                                if return_type:
-                                    self.project_pack_dict.get(package_name).get(temp_class_name)[method_num][
-                                        3] = f'{import_dict.get(return_type)}.{return_type}'
-                                self.project_pack_dict.get(package_name).get(temp_class_name)[method_num][2] = params
+
+
 
 
 
@@ -487,14 +531,9 @@ class AST_parse():
             type_name = 'float'
         return type_name
 
-    # 通过函数调用节点的方法名及参数，查询出符合的库函数
-    def get_overload_method(self, node):
+    # 根据给定的重载方法找到匹配的
+    def get_overload_method_2(self, node, overload_method):
         try:
-            var_name = node.qualifier
-            method_list = self.var_dict[var_name][1]
-            overload_method = [method for method in method_list if method[0] == node.member]
-            # undo 当重叠调用时，参数包含MethodInvocation，和MemberReference两种
-            # 当时内部函数时，暂时添加参数返回值，无法确认重载方法
             if len(overload_method) > 0 and len(overload_method[0]) == 2:
                 right_method = overload_method[0]
             elif len(overload_method) > 1:
@@ -519,7 +558,7 @@ class AST_parse():
                     if method[1].split(',') == argu_type_list:
                         right_method = method
                 if not right_method:
-                    raise MethodNestingExceptin(f"{self.var_dict[var_name][0]}.{node.member}没有找到匹配的重载函数")
+                    raise MethodNestingExceptin("没有找到匹配的重载函数,随即返回")
 
             elif len(overload_method) == 1:
                 right_method = overload_method[0]
@@ -527,8 +566,6 @@ class AST_parse():
                 right_method = None
             # 返回类型：[方法名，[参数]，返回值]
             return right_method
-        except TypeExceptin as e:
-            print(e.str)
         except MethodNestingExceptin:
             argu_num = len(node.arguments)
             # right_method = [method for method in overload_method if (len(method[1].split(',')) == argu_num)][0]
@@ -542,11 +579,24 @@ class AST_parse():
                 else:
                     right_method = None
             return right_method
+
+    # 通过函数调用节点的方法名及参数，查询出符合的库函数
+    def get_overload_method(self, node):
+        try:
+            var_name = node.qualifier
+            method_list = self.var_dict[var_name][1]
+            overload_method = [method for method in method_list if method[0] == node.member]
+            # undo 当重叠调用时，参数包含MethodInvocation，和MemberReference两种
+            # 当时内部函数时，暂时添加参数返回值，无法确认重载方法
+            return self.get_overload_method_2(node, overload_method)
+        except TypeExceptin as e:
+            print(e.str)
+
         except BaseException:
             pass
 
     # 每当添加新api时
-    def update_control_dict(self, path, node):
+    def update_control_dict(self, path):
         # 邻接表新建一行
         now_api_num = len(self.api_list) - 1
         self.G.add_node(now_api_num)
@@ -728,6 +778,7 @@ class AST_parse():
                             else:
                                 self.all_desc_path[self.api_desc] = [api_path]
                     self.api_desc = ''
+
                 if node.documentation:
                     self.api_desc = node.documentation
                 else:
@@ -798,6 +849,23 @@ class AST_parse():
                 if class_meths_dict.__contains__(par_class_name):
                     self.var_dict[node.name] = [f'{pack_name}.{par_class_name}',
                                                 class_meths_dict.get(par_class_name)]
+
+            # 识别new实例化为调用构造器方法，TODO:需要测试
+            elif isinstance(node, Tree.ClassCreator) and not self.api_desc == '':
+                creator_class_name = node.type.name
+                if import_dict.__contains__(creator_class_name):
+                    creator_methods = [method for method in class_meths_dict.get(creator_class_name) if method[0] == creator_class_name]
+                    method_decs = self.get_overload_method_2(node, creator_methods)
+                    if len(method_decs) == 4:
+                        method_class = self.var_dict[var_name][0]
+                        self.api_list.append(f'{method_class}.{method_decs[0]}({method_decs[1]})')
+                    if len(method_decs) == 5:
+                        self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
+                    self.update_control_dict(path, node)
+
+
+
+
             # 方法调用，须与变量名关联，变量名与类关联，类与包信息关联
             elif isinstance(node, Tree.MethodInvocation) and not self.api_desc == '':
                 # if node.member == 'toString':

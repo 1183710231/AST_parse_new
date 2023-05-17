@@ -17,7 +17,7 @@ public class Activator extends AstToDot {
 	// The shared instance
 	private static Activator plugin;
 
-    List l = new ArrayList();
+
 	/**
 	 * The constructor
 	 */
@@ -31,6 +31,8 @@ public class Activator extends AstToDot {
         public void drawSahpe() {
 //           System.out.println(radius);//外部类的private成员
 //           System.out.prinlt(count);//外部类的静态成员
+          List l = new ArrayList(plugin,"ab");
+          AstToDot ast = new AstToDot("ast");
           stop();
           String s = "a";
             s.toLowerCase();
