@@ -23,12 +23,13 @@ public class Activator extends AstToDot {
 	 */
 	public Activator() {
 		plugin = this;
+		String test = AstToDot.endVisit("1111");
 	}
     public class Draw {//内部类
-        /**
+        /*
          * The activator class controls the plug-in life cycle
          */
-        public void drawSahpe() {
+        public static void drawSahpe() {
 //           System.out.println(radius);//外部类的private成员
 //           System.out.prinlt(count);//外部类的静态成员
           List l = new ArrayList(plugin,"ab");
@@ -42,6 +43,8 @@ public class Activator extends AstToDot {
     static class InnerClass {
           static String test = "test";
           int a = 1;
+//        ce shi zhu shi
+//        ce shi zhu shi2
           static void fun1() {}
           void fun2() {}
       }

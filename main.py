@@ -10,7 +10,7 @@ import sys
 
 
 sys.setrecursionlimit(4000)
-
+split_path = 'C:/Users/wkr/Desktop/项目/AST_parse_new/clicy-master/'
 class TypeExceptin(Exception):
     "this is user's Exception for check the length of name "
 
@@ -68,6 +68,8 @@ class AST_parse():
         self.pack_path_dict = dict()
         # 记录每个继承类的方法
         self.extend_class_methods = dict()
+        #记录所有接口信息
+        self.project_pack_interface_dict = dict()
 
     def clear_self(self):
         self.control_node_dict = dict()
@@ -118,9 +120,9 @@ class AST_parse():
                     self.project_pack_dict[pakage_name][class_name] = list()
                 self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
                                                                         None, 'public'])
-            elif isinstance(node, Tree.InterfaceDeclaration) or isinstance(node, Tree.EnumDeclaration):
+            elif isinstance(node, Tree.EnumDeclaration):
                 break
-            elif isinstance(node, Tree.ClassDeclaration):
+            elif isinstance(node, Tree.ClassDeclaration) or isinstance(node, Tree.InterfaceDeclaration):
                 # 如果包含内部类的话
                 # TODO:内部类中的方法内部类还未解决
                 if node in inner_class:
@@ -128,14 +130,20 @@ class AST_parse():
                 elif node in out_class:
                     self.processing_project_api_nodes(node, node.name, pakage_name)
                 else:
+                    if isinstance(node, Tree.ClassDeclaration):
                     # 如果没有构造器加入一个构造器方法
-                    constructors = [constructor for constructor in node.body if isinstance(node, Tree.ConstructorDeclaration)]
-                    if not constructors:
-                        if not self.project_pack_dict[pakage_name].__contains__(class_name):
-                            self.project_pack_dict[pakage_name][class_name] = list()
-                        # TODO:路径该怎么写
-                        self.project_pack_dict[pakage_name][class_name].append(
-                            [node.name, f'{maindir}/{class_name}', [], None, 'public'])
+                        constructors = [constructor for constructor in node.body if isinstance(node, Tree.ConstructorDeclaration)]
+                        if not constructors:
+                            if not self.project_pack_dict[pakage_name].__contains__(class_name):
+                                self.project_pack_dict[pakage_name][class_name] = list()
+                            # TODO:路径该怎么写
+                            self.project_pack_dict[pakage_name][class_name].append(
+                                [node.name, f'{maindir}/{class_name}', [], None, 'public'])
+                    else:
+                        if not self.project_pack_interface_dict.__contains__(pakage_name):
+                            self.project_pack_interface_dict[pakage_name] = dict()
+                        if not self.project_pack_interface_dict[pakage_name].__contains__(class_name):
+                            self.project_pack_interface_dict[pakage_name][class_name] = list()
                     if node.extends:
                         # if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
                         #     print('a')
@@ -145,14 +153,18 @@ class AST_parse():
             #     print('a')
             elif isinstance(node, Tree.MethodDeclaration) and not (isinstance(tree, Tree.CompilationUnit) and (path[-2] in inner_class
                     or path[-2] in out_class)):
-                modifier_types = {'public', 'protected', 'private', 'default'}
-                m_type = modifier_types.intersection(node.modifiers)
+                if isinstance(path[-2], Tree.InterfaceDeclaration):
+                    m_type = 'public'
+                else:
+                    modifier_types = {'public', 'protected', 'private', 'default'}
+                    m_type = ''.join(modifier_types.intersection(node.modifiers))
+                    if not m_type:
+                        m_type = 'default'
+                    if 'static' in node.modifiers:
+                        m_type = f'{m_type},static'
                 params = list()
                 for p in node.parameters:
                     params.append(p.type.name)
-                if not m_type:
-                    m_type = 'default'
-                # try:
                 if not self.project_pack_dict[pakage_name].__contains__(class_name):
                     self.project_pack_dict[pakage_name][class_name] = list()
                 self.project_pack_dict[pakage_name][class_name].append([node.name, f'{maindir}/{class_name}', params,
@@ -578,6 +590,8 @@ class AST_parse():
                     break
                 else:
                     right_method = None
+            if not right_method:
+                right_method = overload_method[0]
             return right_method
 
     # 通过函数调用节点的方法名及参数，查询出符合的库函数
@@ -696,10 +710,12 @@ class AST_parse():
             class_meths_dict[2][key] = [method for method in value if method[-1] == 'public']
         for temp_class_name in class_meths_dict[2].keys():
             import_dict[2][temp_class_name] = 'java.lang'
+        last_node_position = 0
         # print(apath)
         # if apath == 'E:/java_project/github_file/ambari-trunk\\ambari-server\\package-info.java':
         #     print('a')
         for path, node in tree:
+
             if isinstance(node, Tree.CompilationUnit):
                 # TODO:内部类暂时删掉
 
@@ -741,8 +757,14 @@ class AST_parse():
                 # 为应对静态变量
                 for temp_class_name in class_meths_dict.keys():
                     temp_pack_name = import_dict.get(temp_class_name)
-                    self.var_dict[temp_class_name] = [f'{temp_pack_name}.{temp_class_name}',
-                                                 class_meths_dict.get(temp_class_name)]
+                    try:
+                        static_methods = [method for method in self.project_pack_dict.get(temp_pack_name).get(temp_class_name) if 'static' in method[-1]]
+                    except:
+                        continue
+                    if static_methods:
+                        self.var_dict[temp_class_name] = [f'{temp_pack_name}.{temp_class_name}',
+                                                          static_methods]
+
             elif isinstance(node, Tree.InterfaceDeclaration) or isinstance(node, Tree.EnumDeclaration):
                 break
 
@@ -778,42 +800,35 @@ class AST_parse():
                             else:
                                 self.all_desc_path[self.api_desc] = [api_path]
                     self.api_desc = ''
-
-                if node.documentation:
+                # api_line = node.position.line - 2 - len(node.annotations)
+                # if api_line > 20:
+                #     s = lines[api_line - 19:api_line+1]
+                # else:
+                #     s = lines[0:api_line+1]
+                # documentation = re.match("\/\/.*", ''.join(s))
+                # print(documentation.group())
+                api_line = node.position.line - 2 - len(node.annotations)
+                s = lines[last_node_position:api_line+1]
+                documentation = re.findall('//.*', ''.join(s))
+                if documentation:
+                    self.api_desc = ''.join(documentation)
+                elif node.documentation:
                     self.api_desc = node.documentation
                 else:
-                    api_line = node.position.line - 2 - len(node.annotations)
-                    find_start = False
+
                     # undo 如果该方法没有注释
                     if '*/' not in lines[api_line]:
-                        find_start = True
-                    if '*/' in lines[api_line] and '/*' in lines[api_line]:
-                        find_start = True
-                        self.api_desc = lines[api_line].strip().strip('/').strip('*')
-                    try:
-                        while (not find_start):
-                            if api_line > 20:
-                                s = lines[api_line - 20:api_line]
-                            else:
-                                s = lines[0:api_line]
-                            for i in range(1, 21):
-                                if '/*' in s[-i]:
-                                    find_start = True
-                                    self.api_desc = str()
-                                    for j in range(1, i):
-                                        this_line = s[-(i - j)].strip().lstrip('*')
-                                        if this_line.startswith('TODO') or this_line.startswith(
-                                                '@param') or this_line.startswith('@return') or \
-                                                this_line.startswith('NOTE:') or this_line.startswith('test'):
-                                            break
-                                        if this_line.endswith('.'):
-                                            self.api_desc += this_line
-                                            break
-                                        self.api_desc += this_line
-                                    break
-                            api_line -= 20
-                    except IndexError:
                         self.api_desc = ''
+                    elif '*/' in lines[api_line] and '/*' in lines[api_line]:
+                        self.api_desc = lines[api_line].strip().strip('/').strip('*')
+                    else:
+                        try:
+                            doc_start_num = [i for i in range(1, len(s)+1) if '/*' in s[-i]]
+                            if doc_start_num:
+                                self.api_desc = ''.join(s[-(doc_start_num[-1]):])
+                           
+                        except IndexError:
+                            self.api_desc = ''
                 self.G.clear()
                 self.api_list.clear()
                 self.neighbor_dict.clear()
@@ -857,11 +872,12 @@ class AST_parse():
                     creator_methods = [method for method in class_meths_dict.get(creator_class_name) if method[0] == creator_class_name]
                     method_decs = self.get_overload_method_2(node, creator_methods)
                     if len(method_decs) == 4:
-                        method_class = self.var_dict[var_name][0]
-                        self.api_list.append(f'{method_class}.{method_decs[0]}({method_decs[1]})')
+                        # method_class = self.var_dict[var_name][0]
+                        self.api_list.append(f'{method_decs[0]}.{method_decs[0]}({method_decs[1]})')
                     if len(method_decs) == 5:
-                        self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
-                    self.update_control_dict(path, node)
+                        relative_path = f'./{method_decs[1].lstrip(split_path)}'
+                        self.api_list.append(f'{relative_path}.{method_decs[0]}')
+                    self.update_control_dict(path)
 
 
 
@@ -876,10 +892,11 @@ class AST_parse():
                     if method_decs:
                         if len(method_decs) == 4:
                             method_class = self.var_dict[var_name][0]
-                            self.api_list.append(f'{method_class}.{method_decs[0]}({method_decs[1]})')
+                            self.api_list.append(f'./{method_class}.{method_decs[0]}({method_decs[1]})')
                         if len(method_decs) == 5:
-                            self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
-                        self.update_control_dict(path, node)
+                            relative_path = f'./{method_decs[1].lstrip(split_path)}'
+                            self.api_list.append(f'{relative_path}.{method_decs[0]}')
+                        self.update_control_dict(path)
                 # 当连续调用
                 elif not node.qualifier:
                     # 如果是调用本类方法
@@ -887,19 +904,20 @@ class AST_parse():
                         try:
                             method_decs = [method for method in this_class_methods if method[0] == node.member][0]
                             if method_decs:
-                                self.api_list.append(f'{method_decs[1]}.{method_decs[0]}')
-                                self.update_control_dict(path, node)
+                                relative_path = f'./{method_decs[1].lstrip(split_path)}'
+                                self.api_list.append(f'{relative_path}.{method_decs[0]}')
+                                self.update_control_dict(path)
                                 continue
                         except:
                             pass
 
-                    var_father_return_class = self.get_father_return_class(path, node)
+                    var_father_return_class = self.get_father_return_class(path)
                     # TODO:返回
                     if var_father_return_class:
                         # 当父节点方法返回值为None
                         if var_father_return_class == 'None.E':
                             self.api_list.append(f'E.{node.member}(UNKNOW)')
-                            self.update_control_dict(path, node)
+                            self.update_control_dict(path)
                         # 当父节点返回为正常类
                         else:
                             node.qualifier = var_father_return_class.split('.')[-1]
@@ -907,9 +925,14 @@ class AST_parse():
                             if node.qualifier in import_dict.keys():
                                 method_decs = self.get_overload_method(node)
                                 if method_decs:
+                                    relative_path = f'./{var_father_return_class.lstrip(split_path)}'
                                     self.api_list.append(
-                                        f'{var_father_return_class}.{method_decs[0]}({method_decs[1]})')
-                                    self.update_control_dict(path, node)
+                                        f'{relative_path}.{method_decs[0]}({method_decs[1]})')
+                                    self.update_control_dict(path)
+            try:
+                last_node_position = node.position.line
+            except:
+                pass
 
     def parse(self, dirname):
         # self.while_load_pkl('desc_path_dict_2.pkl')
@@ -922,11 +945,12 @@ class AST_parse():
             for java_file in file_name_list:
                 # try:
                 if java_file.endswith('.java'):
-                    try:
-                        self.parse_java_file(java_file, maindir)
-                    except:
-                        pass
-                    # self.parse_java_file(java_file, maindir)
+                    # try:
+                    #     self.parse_java_file(java_file, maindir)
+                    # except Exception as e:
+                    #     print(e)
+                    #     pass
+                    self.parse_java_file(java_file, maindir)
 
         self.dump_pkl_notCover('desc_path_dict_2.pkl', self.all_desc_path)
         print(f'新增{len(self.all_desc_path)}条数据')

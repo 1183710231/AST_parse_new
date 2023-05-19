@@ -63,7 +63,7 @@ class AstToDot extends ClicyAction {
      * @param unit
      *            the AST root node. Bindings have to have been resolved.
      */
-	public String endVisit(String node) {
+	public static String endVisit(String node) {
 		File file = new File(dotfile);
 	    FileWriter writer = null;
 	    try {
