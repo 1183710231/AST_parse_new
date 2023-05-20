@@ -4,12 +4,13 @@ import org.eclipse.core.runtime.Plugin;
 import org.osgi.framework.BundleContext;
 import java.util.List;
 import java.util.ArrayList;
+import test1.interface2;
 
 /**
  * The activator class controls the plug-in life cycle
  */
 
-public class Activator extends AstToDot {
+public class Activator extends AstToDot implements interface2{
 
 	// The plug-in ID
 	public static final String PLUGIN_ID = "com.aasis21.app";

@@ -70,6 +70,8 @@ class AST_parse():
         self.extend_class_methods = dict()
         #记录所有接口信息
         self.project_pack_interface_dict = dict()
+        # 记录所有实现关系
+        self.implements_dict = dict()
 
     def clear_self(self):
         self.control_node_dict = dict()
@@ -84,7 +86,7 @@ class AST_parse():
         self.api_desc = str()
 
     # 获得类及内部类中的方法
-    def processing_project_api_nodes(self, tree, class_name, pakage_name = ''):
+    def processing_project_api_nodes(self, tree, class_name, maindir, pakage_name = ''):
         out_class = []
         inner_class = []
         for path, node in tree:
@@ -126,9 +128,9 @@ class AST_parse():
                 # 如果包含内部类的话
                 # TODO:内部类中的方法内部类还未解决
                 if node in inner_class:
-                    self.processing_project_api_nodes(node, f'{class_name}*{node.name}', pakage_name)
+                    self.processing_project_api_nodes(node, f'{class_name}*{node.name}', maindir, pakage_name)
                 elif node in out_class:
-                    self.processing_project_api_nodes(node, node.name, pakage_name)
+                    self.processing_project_api_nodes(node, node.name, maindir, pakage_name)
                 else:
                     if isinstance(node, Tree.ClassDeclaration):
                     # 如果没有构造器加入一个构造器方法
@@ -145,12 +147,10 @@ class AST_parse():
                         if not self.project_pack_interface_dict[pakage_name].__contains__(class_name):
                             self.project_pack_interface_dict[pakage_name][class_name] = list()
                     if node.extends:
-                        # if f'{pakage_name}.{node.name}' == 'org.activiti.examples.DemoApplicationConfiguration':
-                        #     print('a')
                         self.extend_dict[f'{pakage_name}.{class_name}'] = f'{maindir}/{class_name}.java'
+                    # if node.implements:
+                    #     self.implements_dict[f'{pakage_name}.{class_name}'] = f'{maindir}/{class_name}.java'
 
-            # elif isinstance(node, Tree.LocalVariableDeclaration):
-            #     print('a')
             elif isinstance(node, Tree.MethodDeclaration) and not (isinstance(tree, Tree.CompilationUnit) and (path[-2] in inner_class
                     or path[-2] in out_class)):
                 if isinstance(path[-2], Tree.InterfaceDeclaration):
@@ -195,7 +195,7 @@ class AST_parse():
                         print(f'文件{maindir}/{java_file}获得初步api时无法解析 ')
                         continue
 
-                    self.processing_project_api_nodes(tree, class_name)
+                    self.processing_project_api_nodes(tree, class_name ,maindir)
 
     # 获得参数和返回值的所在包
     # TODO:把导入包的内容存起来，容易溢出
@@ -257,29 +257,8 @@ class AST_parse():
                             import_dict[2].update(import_dict[1])
                             import_dict[2].update(import_dict[0])
                             import_dict = import_dict[2]
-                        elif isinstance(node, Tree.InterfaceDeclaration) or isinstance(node, Tree.EnumDeclaration):
+                        elif isinstance(node, Tree.EnumDeclaration):
                             break
-                        # elif isinstance(node, Tree.ConstructorDeclaration):
-                        #     if other_class in vars() and node in other_class.body:
-                        #         temp_class_name = other_class_name
-                        #     else:
-                        #         temp_class_name = class_name
-                        #     params = list()
-                        #     for p in node.parameters:
-                        #         params.append(p.type.name)
-                        #     all_method_list = self.project_pack_dict.get(package_name).get(temp_class_name)
-                        #     for i in range(len(all_method_list)):
-                        #         if all_method_list[i][0] == node.name and all_method_list[i][2] == params and \
-                        #                 all_method_list[i][3] == None:
-                        #             params.clear()
-                        #             for p in node.parameters:
-                        #                 params.append(f'{import_dict.get(p.type.name)}.{p.type.name}')
-                        #             if return_type:
-                        #                 self.project_pack_dict.get(package_name).get(temp_class_name)[i][
-                        #                     3] = f'{import_dict.get(return_type)}.{return_type}'
-                        #             self.project_pack_dict.get(package_name).get(temp_class_name)[i][
-                        #                 2] = params
-                        #             break
 
                         elif isinstance(node, Tree.ClassDeclaration):
                             other_class = None
@@ -289,6 +268,11 @@ class AST_parse():
                             elif node in out_class:
                                 other_class = node
                                 other_class_name = node.name
+                            if node.implements:
+                                self.implements_dict[f'{package_name}.{class_name}'] = list()
+                                for implement_class_type in node.implements:
+                                    self.implements_dict[
+                                        f'{package_name}.{class_name}'].append(f'{import_dict.get(implement_class_type.name)}.{implement_class_type.name}')
 
                         elif isinstance(node, Tree.MethodDeclaration) or isinstance(node, Tree.ConstructorDeclaration):
                             if other_class and node in other_class.body:
@@ -363,16 +347,16 @@ class AST_parse():
         if not os.path.exists(apath):
             return []
         # TODO:
-        # try:
-        #     f_input = open(apath, 'r', encoding='utf-8')
-        #     f_read = f_input.read()
-        #     tree = javalang.parse.parse(f_read)
-        # except:
-        #     print(f'文件{apath}获取继承包信息时出现问题')
-        #     return class_methods_list
-        f_input = open(apath, 'r', encoding='utf-8')
-        f_read = f_input.read()
-        tree = javalang.parse.parse(f_read)
+        try:
+            f_input = open(apath, 'r', encoding='utf-8')
+            f_read = f_input.read()
+            tree = javalang.parse.parse(f_read)
+        except:
+            print(f'文件{apath}获取继承包信息时出现问题')
+            return class_methods_list
+        # f_input = open(apath, 'r', encoding='utf-8')
+        # f_read = f_input.read()
+        # tree = javalang.parse.parse(f_read)
         # 分三级，0：同包方法，1：全路径引用，2：.*引用
         import_dict = [dict(), dict(), dict()]
         class_meths_dict = [dict(), dict(), dict()]
@@ -410,12 +394,6 @@ class AST_parse():
                 except:
                     return class_methods_list
 
-        # 将本class中的方法加入,如果包含内部类则舍弃
-        # try:
-        #     class_methods_list.extend(self.project_pack_dict.get(package_name).get(class_name))
-        # except TypeError:
-        #     return []
-        # if self.extend_class_methods.__contains__():
         # 增添新属性：'father_protected'，子类可继承但跨包不可调用
         # 这条判断语句其实没用了，但是不删了吧
         if not extend_package_class_name == '' and self.extend_dict.__contains__(package_class_name):
@@ -934,11 +912,122 @@ class AST_parse():
             except:
                 pass
 
+    def get_structure(self, dirname):
+        project_structure_dict = dict()
+        basic_type = ['int','float','double','String','char[]','char']
+
+        def get_extend_or_implements(pack_class_name, class_interface, extend_or_implements, package_project, class_hash):
+            if extend_or_implements == 'extend':
+                temp_dict = self.extend_dict
+            else:
+                temp_dict = self.implements_dict
+            if temp_dict.__contains__(pack_class_name):
+                father_class = temp_dict.get(pack_class_name)
+                father_class_name, father_class_pack = get_pack_name(father_class)
+                if self.pack_path_dict.__contains__(father_class_pack):
+                    father_path = f'./{self.pack_path_dict.get(father_class_pack).lstrip(split_path)}'
+                    father_hash = f'{class_interface}${package_project}${father_path}${father_class_pack}${father_class_name}'
+                    project_structure_dict[class_hash][extend_or_implements] = father_hash
+                else:
+                    # TODO:如果是标准库的话
+                    pass
+
+        def get_method(package_name, class_name, package_project, package_path):
+            for method in self.project_pack_dict.get(package_name).get(class_name):
+                # 构造器
+                if method[0] == class_name:
+                    method[0] = 'new'
+                else:
+                    params = []
+                    for param in method[-3]:
+                        if param in basic_type:
+                            params.append(param)
+                        else:
+                            param_class_name, param_class_pack = get_pack_name(param)
+                            if self.pack_path_dict.__contains__(param_class_pack):
+                                param_path = f'./{self.pack_path_dict.get(param_class_pack).lstrip(split_path)}'
+                                param_hash = f'{method}${package_project}${param_path}${param_class_pack}${param_class_name}'
+                                params.append(param_hash)
+                            elif self.pack_dict.__contains__(param_class_pack):
+                                # TODO:
+                                pass
+                    params_hash = ','.join(params)
+                    if method[-2] not in basic_type:
+                        return_class_name, return_class_pack = get_pack_name(method[-2])
+                        if self.pack_path_dict.__contains__(return_class_pack):
+                            return_path = f'./{self.pack_path_dict.get(return_class_pack).lstrip(split_path)}'
+                            return_hash = f'{method}${package_project}${return_path}${return_class_pack}${return_class_name}'
+                        elif self.pack_dict.__contains__(return_class_pack):
+                            # TODO:
+                            pass
+                    method_hash = f'method${package_project}${package_path}${package_name}${class_name}$' \
+                                  f'{method[-1]},{method[0]}({params_hash})->{return_hash}'
+                    project_structure_dict[method_hash] = {
+                        'type': 'method',
+                        'project': package_project,
+                        'path': package_path,
+                        'package': package_name,
+                        'class': class_name,
+                        'method': method[0],
+                        'field': method[-1],
+                        'hash': method_hash
+                    }
+
+        def package_class_structures():
+            for package_name in self.project_pack_dict.keys():
+                package_project = dirname.split('/')[-1]
+                package_hash = f'package${package_project}${package_name}'
+                package_path = f'./{self.pack_path_dict.get(package_name).lstrip(split_path)}'
+                project_structure_dict[package_hash] = {
+                    'type': 'package',
+                    'project': package_project,
+                    'path': package_path,
+                    'package': package_name,
+                    'contain classes': [],
+                    'hash': package_hash
+                }
+                if self.project_pack_interface_dict.__contains__(package_name):
+                    for interface_name in self.project_pack_interface_dict.get(package_name):
+                        interface_hash = f'interface${package_project}${package_path}${package_name}${interface_name}'
+                        project_structure_dict[interface_hash] = {
+                            'type': 'interface',
+                            'project': package_project,
+                            'path': package_path,
+                            'package': package_name,
+                            'interface': interface_name,
+                            'extend': '',
+                            'hash': interface_hash
+                        }
+                        project_structure_dict.get(package_hash).get('contain classes').append(interface_hash)
+                        get_extend_or_implements(f'{package_name}.{interface_name}', 'interface', 'extend', package_project,
+                                                 interface_hash)
+                        get_method(package_name, class_name, package_project, package_path)
+                for class_name in self.project_pack_dict.get(package_name):
+                    class_hash = f'class${package_project}${package_path}${package_name}${class_name}'
+                    project_structure_dict[class_hash] = {
+                        'type': 'class',
+                        'project': package_project,
+                        'path': package_path,
+                        'package': package_name,
+                        'class': class_name,
+                        'extend': '',
+                        'implement': '',
+                        'hash': class_hash
+                    }
+                    get_extend_or_implements(f'{package_name}.{class_name}', 'class', 'extend' ,package_project, class_hash)
+                    get_extend_or_implements(f'{package_name}.{class_name}', 'interface', 'implements', package_project, class_hash)
+                    project_structure_dict.get(package_hash).get('contain classes').append(class_hash)
+                    get_method(package_name, class_name, package_project, package_path)
+
+        package_class_structures()
+
+
     def parse(self, dirname):
         # self.while_load_pkl('desc_path_dict_2.pkl')
         self.get_project_api(dirname)
         self.get_extend_methods()
         self.get_re_param(dirname)
+        self.get_structure(dirname)
         # file_handle = open('1.txt', mode='w')
         # file_handle.truncate(0)
         for maindir, subdir, file_name_list in os.walk(dirname):
